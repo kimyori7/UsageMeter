@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import subprocess
-from typing import Callable, Optional, Set
+from typing import Callable, Optional, Set, Tuple
 
 import customtkinter as ctk
 
@@ -26,6 +26,7 @@ class MainWindow(ctk.CTk):
         self.config_ref = config
         self._tree: Optional[AggregateTree] = None
         self._expanded: Set[str] = set(self._compose_expanded_keys(config))
+        self._block_progress: Optional[Tuple[float, str]] = None
 
         self.protocol("WM_DELETE_WINDOW", self._handle_close)
         self._build()
@@ -61,7 +62,11 @@ class MainWindow(ctk.CTk):
             self._expanded.add(key)
         self._persist_expanded()
         if self._tree is not None:
-            self.tree_view.update_tree(self._tree, self._expanded)
+            self.tree_view.update_tree(
+                self._tree,
+                self._expanded,
+                current_block_progress=self._block_progress,
+            )
 
     def _persist_expanded(self) -> None:
         self.config_ref.expanded_periods = [
@@ -71,9 +76,15 @@ class MainWindow(ctk.CTk):
             k.split(":", 1)[1] for k in self._expanded if k.startswith("session:")
         ]
 
-    def update_tree(self, tree: AggregateTree) -> None:
+    def update_tree(
+        self,
+        tree: AggregateTree,
+        *,
+        progress: Optional[Tuple[float, str]] = None,
+    ) -> None:
         self._tree = tree
-        self.tree_view.update_tree(tree, self._expanded)
+        self._block_progress = progress
+        self.tree_view.update_tree(tree, self._expanded, current_block_progress=progress)
 
     def _handle_close(self) -> None:
         self.withdraw()

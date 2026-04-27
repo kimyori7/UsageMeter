@@ -3,14 +3,13 @@ from __future__ import annotations
 
 import logging
 import threading
-import time
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List
+from typing import Callable, Dict, List
 
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
-from claudemeter.log_scanner import scan_directory, scan_file_from_offset
+from claudemeter.log_scanner import scan_file_from_offset
 from claudemeter.parser import UsageEvent
 
 logger = logging.getLogger(__name__)

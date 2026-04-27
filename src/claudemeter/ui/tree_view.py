@@ -1,7 +1,7 @@
 # src/claudemeter/ui/tree_view.py
 from __future__ import annotations
 
-from typing import Callable, Optional, Set
+from typing import Callable, Optional, Set, Tuple
 
 import customtkinter as ctk
 
@@ -40,10 +40,18 @@ class TreeView(ctk.CTkScrollableFrame):
         self.compact = compact
         self._tree: Optional[AggregateTree] = None
         self._expanded: Set[str] = set()
+        self._block_progress: Optional[Tuple[float, str]] = None
 
-    def update_tree(self, tree: AggregateTree, expanded: Set[str]) -> None:
+    def update_tree(
+        self,
+        tree: AggregateTree,
+        expanded: Set[str],
+        *,
+        current_block_progress: Optional[Tuple[float, str]] = None,
+    ) -> None:
         self._tree = tree
         self._expanded = expanded
+        self._block_progress = current_block_progress
         self._redraw()
 
     def _redraw(self) -> None:
@@ -66,6 +74,16 @@ class TreeView(ctk.CTkScrollableFrame):
 
         row = self._make_row(0, chevron, label, summary, key)
         row.pack(fill="x", padx=2, pady=1)
+
+        if period == Period.CURRENT_BLOCK and self._block_progress is not None:
+            ratio, remaining_str = self._block_progress
+            progress_row = ctk.CTkFrame(self, fg_color="transparent")
+            ctk.CTkLabel(progress_row, text="", width=20).pack(side="left")
+            bar = ctk.CTkProgressBar(progress_row)
+            bar.set(ratio)
+            bar.pack(side="left", padx=(4, 8), fill="x", expand=True)
+            ctk.CTkLabel(progress_row, text=remaining_str, anchor="e").pack(side="right", padx=(0, 6))
+            progress_row.pack(fill="x", padx=2, pady=(0, 2))
 
         if not expanded:
             return

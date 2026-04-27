@@ -1,7 +1,8 @@
 # src/claudemeter/ui/widget.py
 from __future__ import annotations
 
-from typing import Callable, Optional, Set
+import tkinter as tk
+from typing import Callable, Optional, Set, Tuple
 
 import customtkinter as ctk
 
@@ -11,7 +12,16 @@ from claudemeter.ui.tree_view import TreeView
 
 
 class Widget(ctk.CTkToplevel):
-    def __init__(self, master, config: Config, on_close: Callable[[], None]) -> None:
+    def __init__(
+        self,
+        master,
+        config: Config,
+        on_close: Callable[[], None],
+        on_open_main: Optional[Callable[[], None]] = None,
+        on_open_settings: Optional[Callable[[], None]] = None,
+        on_open_ccusage: Optional[Callable[[], None]] = None,
+        on_quit: Optional[Callable[[], None]] = None,
+    ) -> None:
         super().__init__(master)
         self.title("ClaudeMeter Widget")
         self.geometry("320x540")
@@ -20,7 +30,12 @@ class Widget(ctk.CTkToplevel):
         self.overrideredirect(True)  # frameless
         self.config_ref = config
         self.on_close = on_close
+        self.on_open_main = on_open_main
+        self.on_open_settings = on_open_settings
+        self.on_open_ccusage = on_open_ccusage
+        self.on_quit = on_quit
         self._tree: Optional[AggregateTree] = None
+        self._block_progress: Optional[Tuple[float, str]] = None
 
         if config.widget_position:
             x, y = config.widget_position
@@ -28,11 +43,14 @@ class Widget(ctk.CTkToplevel):
 
         self._expanded: Set[str] = set()
         self._build()
+        self._build_context_menu()
         self._enable_drag()
+        self._bind_context_menu()
 
     def _build(self) -> None:
         header = ctk.CTkFrame(self, height=24, fg_color=("gray80", "gray20"))
         header.pack(fill="x")
+        self._header = header
         ctk.CTkLabel(header, text="🤖 ClaudeMeter", anchor="w").pack(side="left", padx=8)
         ctk.CTkButton(header, text="×", width=24, command=self._handle_close).pack(side="right", padx=2)
 
@@ -44,17 +62,54 @@ class Widget(ctk.CTkToplevel):
         )
         self.tree_view.pack(fill="both", expand=True, padx=2, pady=2)
 
+    def _build_context_menu(self) -> None:
+        self._context_menu = tk.Menu(self, tearoff=0)
+        if self.on_open_main is not None:
+            self._context_menu.add_command(label="메인 창 열기", command=self.on_open_main)
+        if self.on_open_settings is not None:
+            self._context_menu.add_command(label="설정...", command=self.on_open_settings)
+        if self.on_open_ccusage is not None:
+            self._context_menu.add_command(label="ccusage 원본 표 열기", command=self.on_open_ccusage)
+        if self.on_quit is not None:
+            self._context_menu.add_separator()
+            self._context_menu.add_command(label="종료", command=self.on_quit)
+
+    def _bind_context_menu(self) -> None:
+        def popup(event):
+            try:
+                self._context_menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                self._context_menu.grab_release()
+
+        self.bind("<Button-3>", popup)
+        self._header.bind("<Button-3>", popup)
+        for child in self._header.winfo_children():
+            try:
+                child.bind("<Button-3>", popup, add="+")
+            except tk.TclError:
+                pass
+
     def _toggle_row(self, key: str) -> None:
         if key in self._expanded:
             self._expanded.discard(key)
         else:
             self._expanded.add(key)
         if self._tree is not None:
-            self.tree_view.update_tree(self._tree, self._expanded)
+            self.tree_view.update_tree(
+                self._tree,
+                self._expanded,
+                current_block_progress=self._block_progress,
+            )
 
-    def update_tree(self, tree: AggregateTree) -> None:
+    def update_tree(
+        self,
+        tree: AggregateTree,
+        *,
+        progress: Optional[Tuple[float, str]] = None,
+    ) -> None:
         self._tree = tree
-        self.tree_view.update_tree(tree, self._expanded)
+        self._block_progress = progress
+        self.tree_view.update_tree(tree, self._expanded, current_block_progress=progress)
 
     def _enable_drag(self) -> None:
         self._drag_origin = (0, 0)

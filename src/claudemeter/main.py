@@ -18,9 +18,9 @@ from claudemeter.aggregator import (
     aggregate,
     AggregateTree,
 )
-from claudemeter.block_calculator import BLOCK_LENGTH
+from claudemeter.block_calculator import BLOCK_LENGTH, current_block
 from claudemeter.config import Config
-from claudemeter.format import format_dollars, format_tokens
+from claudemeter.format import format_dollars
 from claudemeter.parser import UsageEvent
 from claudemeter.pricing import PriceTable
 from claudemeter.ui.main_window import MainWindow
@@ -39,6 +39,7 @@ class App:
 
         self.price_table = self._load_pricing()
         self.events: List[UsageEvent] = []
+        self._events_lock = threading.Lock()
         self.tree: Optional[AggregateTree] = None
         self.widget: Optional[Widget] = None
 
@@ -56,6 +57,7 @@ class App:
             on_settings=self._open_settings,
             on_open_ccusage=self._open_ccusage,
             on_quit=self._quit,
+            widget_visible=lambda: self.widget is not None,
         )
 
         self.watcher = LogWatcher(paths.claude_log_dir(), on_events=self._on_new_events)
@@ -94,33 +96,61 @@ class App:
             self._show_widget()
 
         initial = self.watcher.initial_scan()
-        self.events.extend(initial)
+        with self._events_lock:
+            self.events.extend(initial)
         self._rebuild_tree()
         self.watcher.start()
 
         self.window.after(self.config.live_refresh_seconds * 1000, self._tick)
+        self.window.after(24 * 3600 * 1000, self._daily_pricing_refresh)
         self.window.mainloop()
 
     def _on_new_events(self, events: List[UsageEvent]) -> None:
-        self.events.extend(events)
+        with self._events_lock:
+            self.events.extend(events)
 
     def _rebuild_tree(self) -> None:
-        self.tree = aggregate(self.events, price_table=self.price_table, now=datetime.now(timezone.utc))
-        self.window.update_tree(self.tree)
+        now = datetime.now(timezone.utc)
+        with self._events_lock:
+            snapshot = list(self.events)
+        self.tree = aggregate(snapshot, price_table=self.price_table, now=now)
+        block = current_block(snapshot, now=now)
+        progress = self._compute_block_progress(block, now)
+        self.window.update_tree(self.tree, progress=progress)
         if self.widget is not None:
-            self.widget.update_tree(self.tree)
-        self._update_tooltip()
+            self.widget.update_tree(self.tree, progress=progress)
+        self._update_tooltip(block=block, now=now)
 
-    def _update_tooltip(self) -> None:
+    @staticmethod
+    def _compute_block_progress(block, now: datetime):
+        if block is None:
+            return None
+        elapsed_ratio = (now - block.start) / BLOCK_LENGTH
+        elapsed_ratio = max(0.0, min(1.0, elapsed_ratio))
+        remaining = block.end - now
+        remaining_secs = max(0, int(remaining.total_seconds()))
+        h = remaining_secs // 3600
+        m = (remaining_secs % 3600) // 60
+        return (elapsed_ratio, f"{h}h{m}m 남음")
+
+    def _update_tooltip(self, *, block=None, now: Optional[datetime] = None) -> None:
         if self.tree is None:
             self.tray.update_tooltip("ClaudeMeter")
             return
-        block = self.tree.periods.get(Period.CURRENT_BLOCK)
+        if now is None:
+            now = datetime.now(timezone.utc)
         today = self.tree.periods.get(Period.TODAY)
-        parts = []
-        if block is not None and block.last_activity is not None:
-            elapsed = datetime.now(timezone.utc) - (block.last_activity - BLOCK_LENGTH)
-            parts.append(f"블록 {format_tokens(block.total_tokens, auto=True)}")
+        parts: List[str] = []
+        if block is not None:
+            elapsed_ratio = (now - block.start) / BLOCK_LENGTH
+            elapsed_ratio = max(0.0, min(1.0, elapsed_ratio))
+            pct = int(elapsed_ratio * 100)
+            remaining = block.end - now
+            remaining_secs = max(0, int(remaining.total_seconds()))
+            h = remaining_secs // 3600
+            m = (remaining_secs % 3600) // 60
+            parts.append(f"블록 {pct}%")
+            parts.append(f"리셋까지 {h}h{m}m")
         if today is not None:
             parts.append(f"오늘 {format_dollars(today.cost)} 상당")
         self.tray.update_tooltip(" · ".join(parts) if parts else "ClaudeMeter")
@@ -128,6 +158,10 @@ class App:
     def _tick(self) -> None:
         self._rebuild_tree()
         self.window.after(self.config.live_refresh_seconds * 1000, self._tick)
+
+    def _daily_pricing_refresh(self) -> None:
+        threading.Thread(target=self._refresh_pricing_async, daemon=True).start()
+        self.window.after(24 * 3600 * 1000, self._daily_pricing_refresh)
 
     def _show_main(self) -> None:
         self.window.show()
@@ -142,7 +176,15 @@ class App:
     def _show_widget(self) -> None:
         if self.widget is not None:
             return
-        self.widget = Widget(self.window, config=self.config, on_close=self._on_widget_closed)
+        self.widget = Widget(
+            self.window,
+            config=self.config,
+            on_close=self._on_widget_closed,
+            on_open_main=self._show_main,
+            on_open_settings=self._open_settings,
+            on_open_ccusage=self._open_ccusage,
+            on_quit=self._quit,
+        )
         if self.tree is not None:
             self.widget.update_tree(self.tree)
 
