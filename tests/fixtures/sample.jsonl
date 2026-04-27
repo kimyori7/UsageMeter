@@ -1,0 +1,5 @@
+{"type":"permission-mode","permissionMode":"default","sessionId":"sess-A"}
+{"type":"user","message":{"role":"user","content":"hi"},"sessionId":"sess-A","timestamp":"2026-04-27T12:00:00.000Z","cwd":"C:\\Users\\me"}
+{"type":"assistant","message":{"model":"claude-opus-4-7","usage":{"input_tokens":10,"cache_creation_input_tokens":1000,"cache_read_input_tokens":500,"output_tokens":200}},"sessionId":"sess-A","timestamp":"2026-04-27T12:00:01.000Z","cwd":"C:\\Users\\me\\Documents\\UsageMeter"}
+{"type":"assistant","message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":5,"cache_creation_input_tokens":0,"cache_read_input_tokens":2000,"output_tokens":150}},"sessionId":"sess-B","timestamp":"2026-04-27T12:05:00.000Z","cwd":"D:\\Projects\\SampleGame"}
+{"type":"assistant","message":{"model":"claude-haiku-4-5","usage":{"input_tokens":1,"cache_creation_input_tokens":0,"cache_read_input_tokens":100,"output_tokens":50}},"sessionId":"sess-A","timestamp":"2026-04-27T12:10:00.000Z","cwd":"C:\\Users\\me\\Documents\\UsageMeter"}
