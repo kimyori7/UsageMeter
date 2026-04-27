@@ -21,15 +21,18 @@ class MainWindow(ctk.CTk):
         super().__init__()
         self.title("ClaudeMeter")
         self.geometry("720x720")
+        self.overrideredirect(True)
         self.on_settings = on_settings
         self.on_close_to_tray = on_close_to_tray
         self.config_ref = config
         self._tree: Optional[AggregateTree] = None
         self._expanded: Set[str] = set(self._compose_expanded_keys(config))
         self._block_progress: Optional[Tuple[float, str]] = None
+        self._drag_origin = (0, 0)
 
         self.protocol("WM_DELETE_WINDOW", self._handle_close)
         self._build()
+        self._enable_header_drag()
 
     @staticmethod
     def _compose_expanded_keys(config: Config) -> Set[str]:
@@ -40,9 +43,11 @@ class MainWindow(ctk.CTk):
     def _build(self) -> None:
         header = ctk.CTkFrame(self, height=40)
         header.pack(fill="x", padx=4, pady=4)
-        ctk.CTkLabel(header, text="🤖 ClaudeMeter", font=("Segoe UI", 14, "bold")).pack(side="left", padx=8)
+        self._header = header
+        self._header_label = ctk.CTkLabel(header, text="🤖 ClaudeMeter", font=("Segoe UI", 14, "bold"))
+        self._header_label.pack(side="left", padx=8)
+        ctk.CTkButton(header, text="✕", width=32, command=self._handle_close).pack(side="right", padx=2)
         ctk.CTkButton(header, text="⚙", width=32, command=self.on_settings).pack(side="right", padx=2)
-        ctk.CTkButton(header, text="─", width=32, command=self._handle_close).pack(side="right", padx=2)
 
         self.tree_view = TreeView(
             self,
@@ -89,6 +94,19 @@ class MainWindow(ctk.CTk):
     def _handle_close(self) -> None:
         self.withdraw()
         self.on_close_to_tray()
+
+    def _enable_header_drag(self) -> None:
+        for w in (self._header, self._header_label):
+            w.bind("<ButtonPress-1>", self._start_drag, add="+")
+            w.bind("<B1-Motion>", self._do_drag, add="+")
+
+    def _start_drag(self, event):
+        self._drag_origin = (event.x_root - self.winfo_x(), event.y_root - self.winfo_y())
+
+    def _do_drag(self, event):
+        x = event.x_root - self._drag_origin[0]
+        y = event.y_root - self._drag_origin[1]
+        self.geometry(f"+{x}+{y}")
 
     def _open_ccusage(self) -> None:
         subprocess.Popen(

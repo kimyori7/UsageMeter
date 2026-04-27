@@ -25,9 +25,8 @@ class Widget(ctk.CTkToplevel):
         super().__init__(master)
         self.title("ClaudeMeter Widget")
         self.geometry("320x540")
+        self.overrideredirect(True)
         self.attributes("-topmost", config.widget_always_on_top)
-        self.attributes("-alpha", config.widget_opacity)
-        self.overrideredirect(True)  # frameless
         self.config_ref = config
         self.on_close = on_close
         self.on_open_main = on_open_main
@@ -46,6 +45,9 @@ class Widget(ctk.CTkToplevel):
         self._build_context_menu()
         self._enable_drag()
         self._bind_context_menu()
+
+        self.update_idletasks()
+        self.after(10, lambda: self.attributes("-alpha", config.widget_opacity))
 
     def _build(self) -> None:
         header = ctk.CTkFrame(self, height=24, fg_color=("gray80", "gray20"))
