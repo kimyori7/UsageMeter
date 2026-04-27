@@ -50,11 +50,25 @@ class Widget(ctk.CTkToplevel):
         self.after(10, lambda: self.attributes("-alpha", config.widget_opacity))
 
     def _build(self) -> None:
-        header = ctk.CTkFrame(self, height=24, fg_color=("gray80", "gray20"))
+        header = ctk.CTkFrame(self, height=28, fg_color=("gray80", "gray20"))
         header.pack(fill="x")
         self._header = header
-        ctk.CTkLabel(header, text="🤖 ClaudeMeter", anchor="w").pack(side="left", padx=8)
+        ctk.CTkLabel(header, text="🤖", anchor="w").pack(side="left", padx=(8, 4))
         ctk.CTkButton(header, text="×", width=24, command=self._handle_close).pack(side="right", padx=2)
+        self._opacity_slider = ctk.CTkSlider(
+            header,
+            from_=0.3,
+            to=1.0,
+            width=90,
+            number_of_steps=14,
+            command=self._on_opacity_change,
+        )
+        self._opacity_slider.set(self.config_ref.widget_opacity)
+        self._opacity_slider.pack(side="right", padx=(4, 6))
+        self._opacity_label = ctk.CTkLabel(
+            header, text=f"{int(self.config_ref.widget_opacity * 100)}%", width=36
+        )
+        self._opacity_label.pack(side="right", padx=(0, 2))
 
         self.tree_view = TreeView(
             self,
@@ -127,6 +141,12 @@ class Widget(ctk.CTkToplevel):
         y = event.y_root - self._drag_origin[1]
         self.geometry(f"+{x}+{y}")
         self.config_ref.widget_position = [x, y]
+
+    def _on_opacity_change(self, value: float) -> None:
+        value = max(0.3, min(1.0, float(value)))
+        self.attributes("-alpha", value)
+        self.config_ref.widget_opacity = value
+        self._opacity_label.configure(text=f"{int(value * 100)}%")
 
     def _handle_close(self) -> None:
         self.destroy()
