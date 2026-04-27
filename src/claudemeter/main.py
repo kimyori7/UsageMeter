@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import subprocess
 import sys
 import threading
@@ -217,10 +218,24 @@ class App:
         )
 
     def _quit(self) -> None:
-        self.config.save(paths.config_path())
-        self.watcher.stop()
-        self.tray.stop()
-        self.window.destroy()
+        try:
+            self.config.save(paths.config_path())
+        except Exception as e:
+            logger.error("Failed to save config on quit: %s", e)
+        try:
+            self.watcher.stop()
+        except Exception as e:
+            logger.error("Failed to stop watcher: %s", e)
+        try:
+            self.tray.stop()
+        except Exception as e:
+            logger.error("Failed to stop tray: %s", e)
+        try:
+            self.window.quit()
+            self.window.destroy()
+        except Exception:
+            pass
+        os._exit(0)
 
 
 def parse_args(argv: List[str]) -> argparse.Namespace:
