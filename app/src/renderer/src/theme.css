@@ -1,0 +1,210 @@
+/* 다크 테마 전용 — 팝업(Task 10)·대시보드(Task 11) 공용 스타일. 색상 팔레트는 다음으로 고정한다:
+   Claude #d97757, Codex #19c37d, 배경 #16161e / 카드 #1e1e2a / 보더 #2a2a38. 라이트 테마 없음. */
+
+:root {
+  --color-bg: #16161e;
+  --color-card-bg: #1e1e2a;
+  --color-border: #2a2a38;
+  --color-border-soft: #2e2e3e;
+  --color-text: #e6e6ef;
+  --color-text-muted: #a7a7ba;
+  --color-text-faint: #8b8b9e;
+  --color-action: #b9b9cc;
+  --color-claude: #d97757;
+  --color-claude-light: #e8a87c;
+  --color-codex: #19c37d;
+  --color-codex-light: #5fe3ad;
+  --color-warn: #e0a030;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family:
+    'Segoe UI',
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  overflow: hidden;
+  user-select: none;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* ── 팝업 ───────────────────────────────────────────────────────────── */
+
+.popup {
+  padding: 14px;
+}
+
+.popup-loading {
+  padding: 20px 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--color-text-faint);
+}
+
+.popup-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--color-text-faint);
+  padding-top: 9px;
+  border-top: 1px solid var(--color-border);
+}
+
+.popup-footer b {
+  color: var(--color-text);
+}
+
+.popup-actions button {
+  background: none;
+  border: none;
+  color: var(--color-action);
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 10px;
+}
+
+.popup-actions button:hover {
+  color: var(--color-text);
+}
+
+/* ── 프로바이더 카드 ────────────────────────────────────────────────── */
+
+.provider-card {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border-soft);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.provider-card--error {
+  filter: grayscale(1);
+  opacity: 0.65;
+}
+
+.provider-card--loading {
+  opacity: 0.5;
+}
+
+.provider-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.provider-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.provider-dot--claude {
+  background: var(--color-claude);
+}
+
+.provider-dot--codex {
+  background: var(--color-codex);
+}
+
+.provider-name {
+  font-weight: 600;
+  font-size: 13px;
+  flex: 1;
+}
+
+.provider-plan {
+  font-size: 10px;
+  color: var(--color-text-faint);
+  border: 1px solid #3a3a4e;
+  border-radius: 8px;
+  padding: 1px 7px;
+}
+
+.provider-caption {
+  font-size: 10px;
+  color: var(--color-text-faint);
+  margin-top: 6px;
+}
+
+.provider-caption--error {
+  color: var(--color-action);
+}
+
+.provider-cost {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--color-text-faint);
+  border-top: 1px solid var(--color-border);
+  padding-top: 7px;
+  margin-top: 9px;
+}
+
+.provider-cost b {
+  color: var(--color-text);
+}
+
+/* ── 게이지 ─────────────────────────────────────────────────────────── */
+/* gauge-row는 자신의 margin-bottom을 갖지 않는다 — 다음 요소(다른 gauge-row, caption, cost)가 항상
+   자기 자신의 margin-top으로 간격을 책임진다. 그래야 "마지막 게이지 줄만 margin-bottom:0"류의
+   :last-child 특수취급 없이도 목업과 동일한 간격이 나온다. */
+
+.gauge-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-bottom: 3px;
+}
+
+.gauge-label b {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.gauge-track {
+  height: 7px;
+  background: var(--color-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.gauge-fill {
+  height: 100%;
+  border-radius: 4px;
+}
+
+.gauge-fill--claude {
+  background: linear-gradient(90deg, var(--color-claude), var(--color-claude-light));
+}
+
+.gauge-fill--codex {
+  background: linear-gradient(90deg, var(--color-codex), var(--color-codex-light));
+}
+
+.gauge-row + .gauge-row {
+  margin-top: 7px;
+}
+
+/* ── 대시보드 (Task 11에서 실제 구현 — 지금은 최소 placeholder) ──────── */
+
+.dashboard-placeholder {
+  padding: 40px;
+  text-align: center;
+  color: var(--color-text-faint);
+}

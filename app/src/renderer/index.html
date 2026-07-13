@@ -8,6 +8,14 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
     />
+    <!-- theme.css가 JS 번들을 통해 로드되기 전에도 프레임리스 창이 흰 화면으로 번쩍이지 않도록 인라인 지정 -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #16161e;
+      }
+    </style>
   </head>
 
   <body>

@@ -16,20 +16,28 @@ export const {
   querySnapshots
 } = window.usagemeter
 
-/** 구독 + 초기 getState()를 하나로 묶은 훅 — 언마운트 시 자동 구독 해제. */
+/**
+ * 구독 + 초기 getState()를 하나로 묶은 훅 — 언마운트 시 자동 구독 해제.
+ * push-wins: onState 구독을 초기 getState() 호출보다 먼저 걸어 두므로, 초기 조회가 늦게 끝나는 동안
+ * 이미 push가 한 번 와 있었다면(pushed=true) 그 뒤늦은 초기값으로 덮어쓰지 않는다(최신 값 유지).
+ */
 export function useAppState(): AppState | null {
   const [state, setState] = useState<AppState | null>(null)
 
   useEffect(() => {
-    let cancelled = false
-    void getState().then((initial) => {
-      if (!cancelled) setState(initial)
+    let pushed = false
+    const unsubscribe = onState((next) => {
+      pushed = true
+      setState(next)
     })
-    const unsubscribe = onState((next) => setState(next))
-    return () => {
-      cancelled = true
-      unsubscribe()
-    }
+    getState()
+      .then((initial) => {
+        if (!pushed) setState(initial)
+      })
+      .catch(() => {
+        // 초기 조회 실패 — push가 오면 정상 복구되므로 여기서는 unhandled rejection만 막는다.
+      })
+    return unsubscribe
   }, [])
 
   return state

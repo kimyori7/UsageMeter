@@ -1,11 +1,13 @@
 // 팝업(트레이 근처, frameless, blur 시 자동 숨김)과 대시보드(일반 창, 이미 있으면 focus) 관리.
-// 렌더러는 아직 Task 9/10에서 IPC·?mode= 분기가 붙기 전까지는 템플릿 데모 화면 그대로 뜬다.
+// 렌더러는 ?mode=popup|dashboard로 분기해 실제 화면을 그린다(Task 10) — 대시보드는 아직 placeholder(Task 11).
 import { BrowserWindow, screen, type Rectangle } from 'electron'
 import { join } from 'node:path'
 import { is } from '@electron-toolkit/utils'
 
 const POPUP_WIDTH = 356
-const POPUP_HEIGHT = 480 // 임시값 — Task 10에서 실콘텐츠 높이로 조정
+// Task 10에서 실콘텐츠 높이로 확정: CDP로 실측한 .popup scrollHeight가 상태별로 320(비대칭 1+2게이지)
+// ~375px(양쪽 2게이지+stale 캡션, 가장 큰 실사용 케이스) — 여유를 두고 400으로 고정.
+const POPUP_HEIGHT = 400
 const DASHBOARD_WIDTH = 960
 const DASHBOARD_HEIGHT = 680
 
