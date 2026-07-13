@@ -1,5 +1,5 @@
-// 부팅 배선: 단일 인스턴스 락 → DB/폴러 구성 → 트레이 생성 → (기본) 대시보드 표시.
-// --start-minimized(자동시작 인자, settings.ts에서 로그인 시 전달)면 창 없이 트레이만 띄운다.
+// 부팅 배선: 단일 인스턴스 락 → DB/폴러 구성 → 트레이 생성. 부팅 시 창은 열지 않는다(트레이 상주) —
+// 창은 트레이 좌클릭(팝업 토글)/메뉴(열기·대시보드)/second-instance(팝업 표시 보장)로만 연다.
 // v1과 달리 단일 프로세스 이벤트 루프라 스레드 데드락 걱정이 없다 — 종료는 tray.destroy() → app.quit()로 충분.
 import { app } from 'electron'
 import type { Tray } from 'electron'
@@ -64,7 +64,8 @@ function boot(): void {
   })
 
   tray = createTray({
-    onOpenPopup: () => windows.showPopup(),
+    onTogglePopup: () => windows.showPopup(),
+    onOpenPopup: () => windows.ensurePopupShown(),
     onOpenDashboard: () => windows.showDashboard(),
     onRefresh: () => void poller?.refreshNow(),
     onQuit: () => quit()
@@ -78,7 +79,9 @@ if (!gotLock) {
   app.quit()
 } else {
   app.on('second-instance', () => {
-    windows.showPopup()
+    // 계약은 "팝업 표시"(보장)지 토글이 아니다 — 이미 떠 있으면 숨기지 말고 앞으로 가져온다.
+    // 부팅(트레이 생성) 전에 이벤트가 오면 getTrayBounds()가 throw하므로 무시한다(uncaught 방지).
+    if (tray) windows.ensurePopupShown()
   })
 
   // 트레이 상주 앱: 모든 창이 닫혀도(대시보드 닫기 등) 앱은 종료하지 않는다 — 종료는 트레이 메뉴로만.

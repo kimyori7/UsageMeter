@@ -43,13 +43,18 @@ export class Windows {
     return { x, y }
   }
 
-  /** 팝업이 보이면 숨기고, 숨겨져 있거나 없으면 트레이 근처에 띄운다(좌클릭 토글). */
+  /** 팝업이 보이면 숨기고, 숨겨져 있거나 없으면 띄운다 — 트레이 좌클릭 전용 토글. */
   showPopup(): void {
+    if (this.popupWin && !this.popupWin.isDestroyed() && this.popupWin.isVisible()) {
+      this.popupWin.hide()
+      return
+    }
+    this.ensurePopupShown()
+  }
+
+  /** 팝업을 반드시 표시·포커스한다 — 절대 숨기지 않는다 (second-instance, 트레이 메뉴 '열기'). */
+  ensurePopupShown(): void {
     if (this.popupWin && !this.popupWin.isDestroyed()) {
-      if (this.popupWin.isVisible()) {
-        this.popupWin.hide()
-        return
-      }
       const { x, y } = this.popupPosition(this.getTrayBounds())
       this.popupWin.setPosition(x, y)
       this.popupWin.show()

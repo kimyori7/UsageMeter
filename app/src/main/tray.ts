@@ -6,6 +6,9 @@ import { join } from 'node:path'
 import { is } from '@electron-toolkit/utils'
 
 export interface TrayCallbacks {
+  /** 좌클릭 — 팝업 토글(보이면 숨김). */
+  onTogglePopup: () => void
+  /** 메뉴 '열기' — 팝업 표시 보장(절대 숨기지 않음). 명시적 '열기'가 닫기로 동작하면 안 된다. */
   onOpenPopup: () => void
   onOpenDashboard: () => void
   onRefresh: () => void
@@ -30,6 +33,6 @@ export function createTray(opts: TrayCallbacks): Tray {
       { label: '종료', click: () => opts.onQuit() }
     ])
   )
-  tray.on('click', () => opts.onOpenPopup())
+  tray.on('click', () => opts.onTogglePopup())
   return tray
 }
