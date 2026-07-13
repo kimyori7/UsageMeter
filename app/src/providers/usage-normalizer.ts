@@ -73,7 +73,8 @@ export function normalizeDaily(provider: ProviderId, cliJson: unknown): DailyRow
 interface RawSession {
   sessionId?: unknown
   projectPath?: unknown // claude
-  sessionFile?: unknown // codex
+  directory?: unknown // codex: sessions 루트 밑 날짜 폴더 (예: 2026/07/13)
+  sessionFile?: unknown // codex: 확장자 없는 rollout 파일 베이스네임
   totalCost?: unknown // claude
   costUSD?: unknown // codex
   totalTokens?: unknown
@@ -95,9 +96,9 @@ function claudeSessionRow(s: RawSession): SessionRow {
 
 function codexSessionRow(
   s: RawSession,
-  cwdOf?: (sessionFile: string) => string | null
+  cwdOf?: (directory: string, sessionFile: string) => string | null
 ): SessionRow {
-  const folder = (cwdOf ? cwdOf(str(s.sessionFile)) : null) ?? '(폴더 미지정)'
+  const folder = (cwdOf ? cwdOf(str(s.directory), str(s.sessionFile)) : null) ?? '(폴더 미지정)'
   return {
     sessionId: str(s.sessionId),
     provider: 'codex',
@@ -112,7 +113,7 @@ function codexSessionRow(
 export function normalizeSessions(
   provider: ProviderId,
   cliJson: unknown,
-  codexCwdOf?: (sessionFile: string) => string | null
+  codexCwdOf?: (directory: string, sessionFile: string) => string | null
 ): SessionRow[] {
   const sessions = (cliJson as { sessions?: RawSession[] } | null)?.sessions
   const rows = Array.isArray(sessions) ? sessions : []
