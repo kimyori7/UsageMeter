@@ -130,9 +130,19 @@ describe('queries', () => {
     expect(other?.providers).toEqual(['claude'])
   })
 
-  it('sessionsInFolder: 지정 folder의 세션만 반환', () => {
+  it('sessionsInFolder: 지정 folder의 세션만 반환하고 snake_case 컬럼을 SessionRow 형태로 매핑', () => {
     const rows = sessionsInFolder(db, 'proj')
     expect(rows.map((r) => r.sessionId).sort()).toEqual(['c1', 'x1'])
+    const c1 = rows.find((r) => r.sessionId === 'c1')
+    expect(c1).toEqual({
+      sessionId: 'c1',
+      provider: 'claude',
+      folder: 'proj',
+      startedAt: null,
+      endedAt: null,
+      totalTokens: 100,
+      costUsd: 1
+    })
   })
 
   it('monthlyRollup: date를 substr(date,1,7)로 월별 그룹핑', () => {
