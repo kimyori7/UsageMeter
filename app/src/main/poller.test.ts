@@ -238,6 +238,72 @@ describe('Poller', () => {
     expect(deps.runCcusage).toHaveBeenCalledTimes(4)
   })
 
+  it('a throwing state listener does not kill the polling loop (both loops re-arm)', async () => {
+    vi.useFakeTimers()
+    const deps = makeDeps()
+    const poller = new Poller(deps)
+    poller.on('state', () => {
+      throw new Error('listener boom')
+    })
+    poller.start()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(deps.fetchClaudeLimits).toHaveBeenCalledTimes(1)
+    expect(deps.runCcusage).toHaveBeenCalledTimes(4)
+
+    await vi.advanceTimersByTimeAsync(60_000) // limits loop survived the throw
+    expect(deps.fetchClaudeLimits).toHaveBeenCalledTimes(2)
+
+    await vi.advanceTimersByTimeAsync(240_000) // usage loop survived too (total 300s)
+    expect(deps.runCcusage).toHaveBeenCalledTimes(8)
+    poller.stop()
+  })
+
+  it('claude usage still persists when the codex CLI fails (partial-failure isolation)', async () => {
+    const deps = makeDeps()
+    const claudeRow = {
+      date: '2026-07-13',
+      provider: 'claude' as const,
+      model: 'opus',
+      inputTokens: 1,
+      outputTokens: 2,
+      cacheTokens: 3,
+      costUsd: 4
+    }
+    ;(deps.runCcusage as ReturnType<typeof vi.fn>).mockImplementation((args: string[]) =>
+      args[0] === 'codex'
+        ? Promise.reject(new Error('cli boom'))
+        : Promise.resolve({ daily: [], sessions: [] })
+    )
+    ;(deps.normalizeDaily as ReturnType<typeof vi.fn>).mockReturnValue([claudeRow])
+    const poller = new Poller(deps)
+    await poller.refreshNow()
+
+    expect(deps.normalizeDaily).toHaveBeenCalledWith('claude', expect.anything())
+    expect(deps.normalizeDaily).not.toHaveBeenCalledWith('codex', expect.anything())
+    expect(deps.upsertDaily).toHaveBeenCalledWith(deps.db, [claudeRow])
+    expect(deps.upsertSessions).toHaveBeenCalledTimes(1)
+    expect(poller.getState().lastUsageSyncAt).not.toBeNull()
+  })
+
+  it('recordSnapshots failure does not mark the fetch failed or trigger backoff', async () => {
+    vi.useFakeTimers()
+    const deps = makeDeps()
+    ;(deps.recordSnapshots as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      throw new Error('db boom')
+    })
+    const poller = new Poller(deps)
+    poller.start()
+    await vi.advanceTimersByTimeAsync(0)
+
+    // fetch 자체는 성공 — stale/error 없이 그대로 반영돼야 한다
+    expect(poller.getState().limits.claude).toEqual(claudeStatus())
+    expect(poller.getState().limits.codex).toEqual(codexStatus())
+
+    await vi.advanceTimersByTimeAsync(60_000) // 백오프 없이 기본 60s에 다음 틱
+    expect(deps.fetchClaudeLimits).toHaveBeenCalledTimes(2)
+    poller.stop()
+  })
+
   it('stop() prevents further scheduled ticks', async () => {
     vi.useFakeTimers()
     const deps = makeDeps()

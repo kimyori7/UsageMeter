@@ -76,8 +76,8 @@ export class Poller extends EventEmitter {
     if (this.running) return
     this.running = true
     // 0ms setTimeout으로 걸어서 페이크 타이머 테스트에서도 결정적으로 흐르게 한다.
-    this.limitsTimer = setTimeout(() => void this.tickLimits(), 0)
-    this.usageTimer = setTimeout(() => void this.tickUsage(), 0)
+    this.scheduleLimits(0)
+    this.scheduleUsage(0)
   }
 
   stop(): void {
@@ -101,17 +101,26 @@ export class Poller extends EventEmitter {
   }
 
   private emitState(): void {
-    this.emit('state', this.getState())
+    try {
+      this.emit('state', this.getState())
+    } catch {
+      // 리스너(트레이/IPC 구독자)의 예외가 폴링 루프의 재예약을 막으면 안 된다.
+    }
   }
 
+  // 타이머 콜백은 fire-and-forget이라 .catch 백스톱으로 unhandled rejection을 차단한다.
   private scheduleLimits(delayMs: number): void {
     if (this.limitsTimer) clearTimeout(this.limitsTimer)
-    this.limitsTimer = this.running ? setTimeout(() => void this.tickLimits(), delayMs) : null
+    this.limitsTimer = this.running
+      ? setTimeout(() => void this.tickLimits().catch(() => undefined), delayMs)
+      : null
   }
 
   private scheduleUsage(delayMs: number): void {
     if (this.usageTimer) clearTimeout(this.usageTimer)
-    this.usageTimer = this.running ? setTimeout(() => void this.tickUsage(), delayMs) : null
+    this.usageTimer = this.running
+      ? setTimeout(() => void this.tickUsage().catch(() => undefined), delayMs)
+      : null
   }
 
   private async fetchProviderLimits(provider: ProviderId): Promise<RateStatus> {
@@ -132,7 +141,11 @@ export class Poller extends EventEmitter {
           this.state.limits[provider] = this.staleFallback(provider, status)
         } else {
           this.state.limits[provider] = status
-          this.deps.recordSnapshots(this.deps.db, status)
+          try {
+            this.deps.recordSnapshots(this.deps.db, status)
+          } catch {
+            // 스냅샷 기록(DB) 실패는 fetch 성공 판정과 무관 — 상태는 정상 유지, 다음 틱에 재시도.
+          }
         }
       } catch {
         // 방어적 처리 — 실제 구현은 throw하지 않지만 예상 밖의 예외에도 동일하게 대응한다.
@@ -157,30 +170,48 @@ export class Poller extends EventEmitter {
     return prev ? { ...prev, stale: true, error: freshError.error } : freshError
   }
 
+  /** 한 provider의 daily+session을 수집·정규화한다. CLI 실패 시 null — 다른 provider와 격리. */
+  private async collectUsage(
+    provider: ProviderId
+  ): Promise<{ daily: DailyRow[]; sessions: SessionRow[] } | null> {
+    try {
+      const [daily, sessions] = await Promise.all([
+        this.deps.runCcusage([provider, 'daily', '--json']),
+        this.deps.runCcusage([provider, 'session', '--json'])
+      ])
+      return {
+        daily: this.deps.normalizeDaily(provider, daily),
+        sessions: this.deps.normalizeSessions(
+          provider,
+          sessions,
+          provider === 'codex' ? this.deps.codexCwdOf : undefined
+        )
+      }
+    } catch {
+      return null // 이 provider의 CLI 실패 — 다른 provider의 정상 데이터는 계속 반영한다.
+    }
+  }
+
   private async tickUsage(): Promise<void> {
     if (this.usageRunning) return
     this.usageRunning = true
     try {
-      const [claudeDaily, codexDaily, claudeSessions, codexSessions] = await Promise.all([
-        this.deps.runCcusage(['claude', 'daily', '--json']),
-        this.deps.runCcusage(['codex', 'daily', '--json']),
-        this.deps.runCcusage(['claude', 'session', '--json']),
-        this.deps.runCcusage(['codex', 'session', '--json'])
-      ])
-      const dailyRows = [
-        ...this.deps.normalizeDaily('claude', claudeDaily),
-        ...this.deps.normalizeDaily('codex', codexDaily)
-      ]
-      const sessionRows = [
-        ...this.deps.normalizeSessions('claude', claudeSessions),
-        ...this.deps.normalizeSessions('codex', codexSessions, this.deps.codexCwdOf)
-      ]
-      this.deps.upsertDaily(this.deps.db, dailyRows)
-      this.deps.upsertSessions(this.deps.db, sessionRows)
-      this.state.today = this.deps.todayByProvider(this.deps.db, todayDateString())
-      this.state.lastUsageSyncAt = Date.now()
+      const collected = await Promise.all([this.collectUsage('claude'), this.collectUsage('codex')])
+      const ok = collected.filter((c) => c !== null)
+      if (ok.length > 0) {
+        this.deps.upsertDaily(
+          this.deps.db,
+          ok.flatMap((c) => c.daily)
+        )
+        this.deps.upsertSessions(
+          this.deps.db,
+          ok.flatMap((c) => c.sessions)
+        )
+        this.state.today = this.deps.todayByProvider(this.deps.db, todayDateString())
+        this.state.lastUsageSyncAt = Date.now()
+      }
     } catch {
-      // ccusage/DB 실패 — last-good 상태(DB에 남은 이전 값)를 유지하고 다음 주기에 재시도.
+      // DB upsert/재조회 실패 — last-good 상태(DB에 남은 이전 값)를 유지하고 다음 주기에 재시도.
     } finally {
       this.usageRunning = false
       this.emitState()
