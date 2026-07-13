@@ -4,6 +4,16 @@
 import { useEffect, useState } from 'react'
 import type { AppState } from '../../main/poller'
 
+// preload가 실패했거나(contextBridge.exposeInMainWorld throw) contextIsolation이 꺼진 채 로드된 경우
+// window.usagemeter가 없다 — 아래 구조 분해가 그냥 실행되면 "Cannot destructure property 'getState' of
+// undefined"처럼 원인을 알 수 없는 TypeError로 백색 화면만 남는다. 여기서 먼저 걸러 원인이 드러나는
+// 에러로 바꾼다(복구 로직은 없음 — preload 배선 자체가 깨진 상황이라 렌더러가 스스로 고칠 수 없다).
+if (!window.usagemeter) {
+  throw new Error(
+    'window.usagemeter가 없습니다 — preload 스크립트 로드 또는 contextBridge 노출에 실패했습니다.'
+  )
+}
+
 export const {
   getState,
   onState,

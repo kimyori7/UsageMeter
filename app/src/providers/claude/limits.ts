@@ -6,7 +6,7 @@ const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage'
 function toEpochSec(v: unknown): number {
   if (typeof v === 'number') return v > 1e12 ? Math.round(v / 1000) : v
   const t = Date.parse(String(v))
-  return Number.isNaN(t) ? 0 : t / 1000
+  return Number.isNaN(t) ? 0 : Math.round(t / 1000)
 }
 
 function win(kind: RateWindow['kind'], raw: unknown): RateWindow | null {
