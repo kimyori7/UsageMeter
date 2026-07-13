@@ -26,10 +26,29 @@ export function fmtMoney(usd: number): string {
   return `$${usd.toFixed(2)}`
 }
 
-/** '42.1M tok' 형태 — B/M/K 단위로 자동 축약(소수 1자리), 1000 미만은 그대로 tok만 붙인다. */
+/**
+ * '42.1M tok' 형태 — B/M/K 단위로 자동 축약(소수 1자리), 1000 미만은 그대로 tok만 붙인다.
+ * 단위 전환 경계는 1e6/1e9가 아니라 999,950/999,950,000 — toFixed(1) 반올림으로 하위 단위 가수가
+ * "1000.0"으로 읽히는 값(예: 999,950 → "1000.0K")은 상위 단위("1.0M")로 미리 넘긴다.
+ */
 export function fmtTokens(n: number): string {
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B tok`
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M tok`
+  if (n >= 999_950_000) return `${(n / 1_000_000_000).toFixed(1)}B tok`
+  if (n >= 999_950) return `${(n / 1_000_000).toFixed(1)}M tok`
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K tok`
   return `${n} tok`
+}
+
+const WARN_PERCENT = 90
+
+/** 게이지 라벨에 표시하는 정수 % — 표시와 경고 판정이 반드시 같은 반올림 값을 쓰도록 하는 단일 진입점. */
+export function displayPercent(usedPercent: number): number {
+  return Math.round(usedPercent)
+}
+
+/**
+ * 경고색(≥90%) 판정 — 원본 값이 아니라 displayPercent(반올림된 표시값) 기준.
+ * 89.6처럼 라벨에 "90%"로 보이는 값이 경고색 없이 그려지는 표시-색 모순을 막는다.
+ */
+export function isWarnPercent(usedPercent: number): boolean {
+  return displayPercent(usedPercent) >= WARN_PERCENT
 }

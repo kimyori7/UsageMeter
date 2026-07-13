@@ -3,7 +3,7 @@
 // 결정적 시각을 만든다 — 이 머신(Asia/Seoul)뿐 아니라 어떤 타임존에서 실행해도 구현과 테스트가
 // 동일한 로컬 해석을 쓰므로 안전하다.
 import { describe, expect, it } from 'vitest'
-import { fmtMoney, fmtReset, fmtTokens } from './format'
+import { displayPercent, fmtMoney, fmtReset, fmtTokens, isWarnPercent } from './format'
 
 function localSec(y: number, m: number, d: number, h = 0, mi = 0, s = 0): number {
   return Math.floor(new Date(y, m - 1, d, h, mi, s).getTime() / 1000)
@@ -84,5 +84,29 @@ describe('fmtTokens', () => {
 
   it('B 단위로 축약한다', () => {
     expect(fmtTokens(1_500_000_000)).toBe('1.5B tok')
+  })
+
+  it('반올림 시 하위 단위 가수가 1000.0으로 읽히는 경계에서는 상위 단위로 넘어간다', () => {
+    // 999,950은 K로 표기하면 toFixed(1) 반올림 탓에 "1000.0K"가 된다 — M으로 미리 전환해야 한다.
+    expect(fmtTokens(999_950)).toBe('1.0M tok')
+    expect(fmtTokens(999_950_000)).toBe('1.0B tok')
+    // 경계 직전 값은 여전히 하위 단위를 유지한다.
+    expect(fmtTokens(999_949)).toBe('999.9K tok')
+    expect(fmtTokens(999_949_999)).toBe('999.9M tok')
+  })
+})
+
+describe('displayPercent / isWarnPercent', () => {
+  it('표시 %는 반올림한 정수', () => {
+    expect(displayPercent(89.6)).toBe(90)
+    expect(displayPercent(89.4)).toBe(89)
+  })
+
+  it('경고 판정은 표시 %와 동일한 반올림 값 기준 — 라벨이 90%로 보이면 색도 경고여야 한다', () => {
+    // 89.6은 라벨에 "90%"로 표시되므로 경고색이 함께 켜져야 한다(표시-색 모순 방지).
+    expect(isWarnPercent(89.6)).toBe(true)
+    expect(isWarnPercent(89.4)).toBe(false)
+    expect(isWarnPercent(90)).toBe(true)
+    expect(isWarnPercent(100)).toBe(true)
   })
 })
