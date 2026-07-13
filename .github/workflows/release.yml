@@ -30,6 +30,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # electron-builder.yml sets npmRebuild: false, so the packaged better-sqlite3 ABI depends
+      # entirely on the postinstall install-app-deps having run correctly. Rebuild explicitly so a
+      # silent no-op can't ship a wrong-ABI installer (CI never boots the artifact to catch it).
+      - name: Rebuild native modules for Electron ABI
+        run: npx @electron/rebuild -f -w better-sqlite3
+
       - name: Build + package (Windows NSIS installer)
         run: npm run build:win
 
