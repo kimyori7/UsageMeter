@@ -8,6 +8,7 @@ import ProviderToggle from '../components/ProviderToggle'
 import OverviewTab from './OverviewTab'
 import DailyTab from './DailyTab'
 import FoldersTab from './FoldersTab'
+import MonthlyTab from './MonthlyTab'
 import type { Period } from './period'
 import type { ProviderId } from '../../../providers/types'
 
@@ -66,8 +67,12 @@ export default function Dashboard(): React.JSX.Element {
             {activeTab === 'overview' && <OverviewTab period={period} providers={providers} />}
             {activeTab === 'daily' && <DailyTab period={period} providers={providers} />}
             {activeTab === 'folders' && <FoldersTab period={period} providers={providers} />}
-            {/* 월 리포트/설정은 후속 커밋에서 채운다(다음 2개 커밋 참고). */}
-            {(activeTab === 'monthly' || activeTab === 'settings') && (
+            {/* 월 리포트는 필터 바가 없다(design doc §6에 기간·프로바이더 필터 언급 없음) — 항상 전체
+                프로바이더 기준 리포트를 보여준다. providers 상태를 여기서 넘기지 않는 건 실수가
+                아니라 의도적 단순화: 필터 UI 없이 다른 탭의 토글 상태를 몰래 상속하면 더 헷갈린다. */}
+            {activeTab === 'monthly' && <MonthlyTab />}
+            {/* 설정은 다음 커밋에서 채운다. */}
+            {activeTab === 'settings' && (
               <div className="dashboard-empty">이 탭은 다음 커밋에서 구현됩니다.</div>
             )}
           </>
