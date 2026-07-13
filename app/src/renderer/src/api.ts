@@ -9,6 +9,7 @@ export const {
   onState,
   refresh,
   openDashboard,
+  resizePopup,
   queryDaily,
   queryFolders,
   queryFolderSessions,

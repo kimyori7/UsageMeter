@@ -32,6 +32,10 @@ const usagemeter = {
   },
   refresh: (): Promise<void> => ipcRenderer.invoke(CHANNELS.actionRefresh),
   openDashboard: (): Promise<void> => ipcRenderer.invoke(CHANNELS.actionOpenDashboard),
+  /** 팝업 콘텐츠 높이 보고(fire-and-forget) — 메인이 sender 검증·클램프 후 팝업 창만 리사이즈한다. */
+  resizePopup: (height: number): void => {
+    ipcRenderer.send(CHANNELS.popupResize, height)
+  },
   queryDaily: (opts?: DailyOpts): Promise<DailyRow[]> =>
     ipcRenderer.invoke(CHANNELS.queryDaily, opts),
   queryFolders: (opts?: FolderOpts): Promise<FolderRollupRow[]> =>

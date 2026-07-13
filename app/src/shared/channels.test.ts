@@ -5,12 +5,13 @@ import { describe, expect, it } from 'vitest'
 import { CHANNELS } from './channels'
 
 describe('CHANNELS', () => {
-  it('matches the channel-name contract from the task-9 brief', () => {
+  it('matches the channel-name contract (task-9 brief + task-10 popup:resize)', () => {
     expect(CHANNELS).toEqual({
       stateGet: 'state:get',
       statePush: 'state:push',
       actionRefresh: 'action:refresh',
       actionOpenDashboard: 'action:open-dashboard',
+      popupResize: 'popup:resize',
       queryDaily: 'query:daily',
       queryFolders: 'query:folders',
       queryFolderSessions: 'query:folder-sessions',

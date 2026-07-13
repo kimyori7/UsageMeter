@@ -1,13 +1,15 @@
 // 팝업(트레이 근처, frameless, blur 시 자동 숨김)과 대시보드(일반 창, 이미 있으면 focus) 관리.
 // 렌더러는 ?mode=popup|dashboard로 분기해 실제 화면을 그린다(Task 10) — 대시보드는 아직 placeholder(Task 11).
-import { BrowserWindow, screen, type Rectangle } from 'electron'
+import { BrowserWindow, screen, type Rectangle, type WebContents } from 'electron'
 import { join } from 'node:path'
 import { is } from '@electron-toolkit/utils'
 
 const POPUP_WIDTH = 356
-// Task 10에서 실콘텐츠 높이로 확정: CDP로 실측한 .popup scrollHeight가 상태별로 320(비대칭 1+2게이지)
-// ~375px(양쪽 2게이지+stale 캡션, 가장 큰 실사용 케이스) — 여유를 두고 400으로 고정.
+// 초기 높이일 뿐 — 로드 직후 렌더러가 콘텐츠 높이를 보고하면(popup:resize) content-fit으로 조정된다.
 const POPUP_HEIGHT = 400
+// 렌더러 보고값 클램프 범위 — 비정상 값(0·거대값)이 와도 창이 사라지거나 화면을 덮지 않게 방어한다.
+const POPUP_MIN_HEIGHT = 180
+const POPUP_MAX_HEIGHT = 560
 const DASHBOARD_WIDTH = 960
 const DASHBOARD_HEIGHT = 680
 
@@ -32,16 +34,16 @@ export class Windows {
   /** 팝업 위치 계산에 트레이 아이콘의 현재 화면 좌표가 필요해 지연 조회 함수로 주입받는다. */
   constructor(private readonly getTrayBounds: () => Rectangle) {}
 
-  private popupPosition(trayBounds: Rectangle): { x: number; y: number } {
+  private popupPosition(trayBounds: Rectangle, height: number): { x: number; y: number } {
     const trayCenter = {
       x: trayBounds.x + trayBounds.width / 2,
       y: trayBounds.y + trayBounds.height / 2
     }
     const { workArea } = screen.getDisplayNearestPoint(trayCenter)
     const rawX = Math.round(trayBounds.x + trayBounds.width / 2 - POPUP_WIDTH / 2)
-    const rawY = Math.round(trayBounds.y - POPUP_HEIGHT) // Windows 작업표시줄은 보통 하단 — 트레이 위로 띄운다
+    const rawY = Math.round(trayBounds.y - height) // Windows 작업표시줄은 보통 하단 — 트레이 위로 띄운다
     const x = Math.min(Math.max(rawX, workArea.x), workArea.x + workArea.width - POPUP_WIDTH)
-    const y = Math.min(Math.max(rawY, workArea.y), workArea.y + workArea.height - POPUP_HEIGHT)
+    const y = Math.min(Math.max(rawY, workArea.y), workArea.y + workArea.height - height)
     return { x, y }
   }
 
@@ -57,13 +59,14 @@ export class Windows {
   /** 팝업을 반드시 표시·포커스한다 — 절대 숨기지 않는다 (second-instance, 트레이 메뉴 '열기'). */
   ensurePopupShown(): void {
     if (this.popupWin && !this.popupWin.isDestroyed()) {
-      const { x, y } = this.popupPosition(this.getTrayBounds())
+      // content-fit으로 조정된 현재 높이를 기준으로 재배치한다 — 초기 상수로 되돌리면 위치가 어긋난다.
+      const { x, y } = this.popupPosition(this.getTrayBounds(), this.popupWin.getBounds().height)
       this.popupWin.setPosition(x, y)
       this.popupWin.show()
       this.popupWin.focus()
       return
     }
-    const { x, y } = this.popupPosition(this.getTrayBounds())
+    const { x, y } = this.popupPosition(this.getTrayBounds(), POPUP_HEIGHT)
     const win = new BrowserWindow({
       width: POPUP_WIDTH,
       height: POPUP_HEIGHT,
@@ -84,6 +87,21 @@ export class Windows {
       this.popupWin = null
     })
     this.popupWin = win
+  }
+
+  /**
+   * 렌더러가 보고한 콘텐츠 높이(popup:resize)로 팝업 창을 content-fit한다.
+   * sender가 팝업 창의 webContents일 때만 동작 — 대시보드(또는 다른 어떤 창)가 이 채널로
+   * 팝업을 리사이즈하는 것을 막는다. 높이는 MIN/MAX로 클램프하고, 변화가 없으면 no-op,
+   * 변하면 트레이 기준 배치를 다시 계산해 작업영역 밖으로 밀리지 않게 재클램프한다.
+   */
+  resizePopup(sender: WebContents, contentHeight: number): void {
+    const win = this.popupWin
+    if (!win || win.isDestroyed() || win.webContents !== sender) return
+    const height = Math.min(POPUP_MAX_HEIGHT, Math.max(POPUP_MIN_HEIGHT, Math.ceil(contentHeight)))
+    if (win.getBounds().height === height) return
+    const { x, y } = this.popupPosition(this.getTrayBounds(), height)
+    win.setBounds({ x, y, width: POPUP_WIDTH, height })
   }
 
   /** 대시보드가 이미 떠 있으면 focus만, 없으면 새로 만든다. */

@@ -17,7 +17,7 @@ import {
 export interface IpcDeps {
   db: Database.Database
   poller: Poller
-  windows: Pick<Windows, 'showDashboard'>
+  windows: Pick<Windows, 'showDashboard' | 'resizePopup'>
 }
 
 /**
@@ -30,6 +30,14 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle(CHANNELS.stateGet, () => poller.getState())
   ipcMain.handle(CHANNELS.actionRefresh, () => poller.refreshNow())
   ipcMain.handle(CHANNELS.actionOpenDashboard, () => windows.showDashboard())
+
+  // 팝업 content-fit 높이 보고(fire-and-forget send). 값 검증은 여기서 최소(유한 숫자만),
+  // sender가 팝업 창인지의 권한 검증과 클램프·no-op 스킵은 windows.resizePopup 책임.
+  ipcMain.on(CHANNELS.popupResize, (event, height: unknown) => {
+    if (typeof height === 'number' && Number.isFinite(height)) {
+      windows.resizePopup(event.sender, height)
+    }
+  })
 
   ipcMain.handle(CHANNELS.queryDaily, (_event, opts?: Parameters<typeof dailyTotals>[1]) =>
     dailyTotals(db, opts)

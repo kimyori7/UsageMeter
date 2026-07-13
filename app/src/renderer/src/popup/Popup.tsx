@@ -3,15 +3,19 @@
 import ProviderCard from './ProviderCard'
 import { fmtMoney } from './format'
 import { useNow } from './useNow'
+import { usePopupHeight } from './usePopupHeight'
 import { openDashboard, refresh, useAppState } from '../api'
 
 export default function Popup(): React.JSX.Element {
   const state = useAppState()
   const now = useNow()
+  // 루트 높이를 메인에 보고해 창을 content-fit — 두 return 분기 모두 같은 위치의 .popup 루트 div라
+  // React가 DOM 노드를 재사용하므로 마운트 시 한 번 잡은 ref가 상태 전환 후에도 유효하다.
+  const rootRef = usePopupHeight<HTMLDivElement>()
 
   if (!state) {
     return (
-      <div className="popup">
+      <div className="popup" ref={rootRef}>
         <div className="popup-loading">불러오는 중…</div>
       </div>
     )
@@ -20,7 +24,7 @@ export default function Popup(): React.JSX.Element {
   const total = state.today.claude.costUsd + state.today.codex.costUsd
 
   return (
-    <div className="popup">
+    <div className="popup" ref={rootRef}>
       <ProviderCard
         providerId="claude"
         status={state.limits.claude}

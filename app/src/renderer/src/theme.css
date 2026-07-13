@@ -95,10 +95,6 @@ body {
   opacity: 0.65;
 }
 
-.provider-card--loading {
-  opacity: 0.5;
-}
-
 .provider-header {
   display: flex;
   align-items: center;
@@ -199,6 +195,11 @@ body {
 
 .gauge-row + .gauge-row {
   margin-top: 7px;
+}
+
+/* 데이터에 없는 kind의 자리 표시 줄 — 라벨/트랙 구조는 유지하고 흐리게만(값은 —, 트랙은 빈 채로). */
+.gauge-row--absent {
+  opacity: 0.5;
 }
 
 /* ── 대시보드 (Task 11에서 실제 구현 — 지금은 최소 placeholder) ──────── */

@@ -6,6 +6,7 @@ export const CHANNELS = {
   statePush: 'state:push',
   actionRefresh: 'action:refresh',
   actionOpenDashboard: 'action:open-dashboard',
+  popupResize: 'popup:resize',
   queryDaily: 'query:daily',
   queryFolders: 'query:folders',
   queryFolderSessions: 'query:folder-sessions',
