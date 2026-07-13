@@ -2,8 +2,8 @@ __pycache__/
 *.pyc
 .venv/
 venv/
-build/
-dist/
+/build/
+/dist/
 *.spec
 *.egg-info/
 .pytest_cache/
@@ -11,5 +11,5 @@ dist/
 *.exe
 .coverage
 .idea/
-.vscode/
+/.vscode/
 .superpowers/
