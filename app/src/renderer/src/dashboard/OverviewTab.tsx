@@ -4,11 +4,19 @@
 import { useEffect, useState } from 'react'
 import StatCard from '../components/StatCard'
 import UsageChart from '../components/UsageChart'
-import { queryDaily, queryMonthly, useAppState } from '../api'
+import SnapshotChart from '../components/SnapshotChart'
+import { queryDaily, queryMonthly, querySnapshots, useAppState } from '../api'
 import { pivotDaily, type PivotedDailyRow } from './reshape'
-import { currentMonthPrefix, lastNDaysRange, periodRange, type Period } from './period'
+import { mergeSnapshotSeries, type SnapshotChartPoint } from './snapshotChart'
+import {
+  currentMonthPrefix,
+  lastNDaysRange,
+  periodFromMs,
+  periodRange,
+  type Period
+} from './period'
 import { displayPercent, fmtMoney } from '../popup/format'
-import type { ProviderId } from '../../../providers/types'
+import type { ProviderId, WindowKind } from '../../../providers/types'
 
 interface OverviewTabProps {
   period: Period
@@ -16,12 +24,14 @@ interface OverviewTabProps {
 }
 
 const PROVIDER_LABEL: Record<ProviderId, string> = { claude: 'Claude', codex: 'Codex' }
+const WINDOW_KINDS: WindowKind[] = ['session_5h', 'weekly']
 
 export default function OverviewTab({ period, providers }: OverviewTabProps): React.JSX.Element {
   const appState = useAppState()
   const [weekCost, setWeekCost] = useState<number | null>(null)
   const [monthCost, setMonthCost] = useState<number | null>(null)
   const [chartRows, setChartRows] = useState<PivotedDailyRow[]>([])
+  const [snapshotPoints, setSnapshotPoints] = useState<SnapshotChartPoint[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -42,6 +52,27 @@ export default function OverviewTab({ period, providers }: OverviewTabProps): Re
           .filter((r) => r.month === monthPrefix && providers.includes(r.provider))
           .reduce((sum, r) => sum + r.costUsd, 0)
       )
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [period, providers])
+
+  // 한도 소진 추이 — 선택된 프로바이더 × session/weekly 조합만 조회(꺼진 프로바이더는 쿼리 자체를 안 보냄).
+  useEffect(() => {
+    let cancelled = false
+    const from = periodFromMs(period)
+    const targets = providers.flatMap((provider) =>
+      WINDOW_KINDS.map((window) => ({ provider, window }))
+    )
+
+    Promise.all(
+      targets.map(({ provider, window }) =>
+        querySnapshots({ provider, window, from }).then((rows) => ({ provider, window, rows }))
+      )
+    ).then((series) => {
+      if (!cancelled) setSnapshotPoints(mergeSnapshotSeries(series))
     })
 
     return () => {
@@ -75,6 +106,9 @@ export default function OverviewTab({ period, providers }: OverviewTabProps): Re
       </div>
 
       <UsageChart data={chartRows} metric="cost" />
+
+      <div className="overview-section-title">한도 소진 추이</div>
+      <SnapshotChart data={snapshotPoints} />
     </div>
   )
 }

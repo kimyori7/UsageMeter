@@ -31,3 +31,17 @@ export function periodRange(period: Period, today: Date = new Date()): DateRange
 export function currentMonthPrefix(today: Date = new Date()): string {
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
 }
+
+/**
+ * 기간 칩 선택값을 snapshotSeries(query:snapshots)의 opts.from(epoch ms, 필수 파라미터)으로 변환.
+ * 'all'은 0(경계 없음). new Date(periodRange(period).from)처럼 'YYYY-MM-DD' 문자열을 직접 Date로
+ * 파싱하지 않는다 — 문자열 단독 파싱은 UTC 자정으로 해석되어(ISO 8601 date-only 스펙) 로컬 자정과
+ * 어긋난다(KST 등 UTC+오프셋에서 9시간 밀림). periodRange의 from을 y/m/d로 분해해 lastNDaysRange와
+ * 동일한 로컬 Date 생성자로 다시 만든다.
+ */
+export function periodFromMs(period: Period, today: Date = new Date()): number {
+  const { from } = periodRange(period, today)
+  if (!from) return 0
+  const [y, m, d] = from.split('-').map(Number)
+  return new Date(y, m - 1, d).getTime()
+}

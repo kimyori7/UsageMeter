@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { currentMonthPrefix, lastNDaysRange, periodRange } from './period'
+import { currentMonthPrefix, lastNDaysRange, periodFromMs, periodRange } from './period'
 
 describe('lastNDaysRange', () => {
   it('n일(오늘 포함) 범위를 YYYY-MM-DD 문자열로 반환', () => {
@@ -42,6 +42,23 @@ describe('periodRange', () => {
 
   it("'all'은 경계 없음(빈 객체)", () => {
     expect(periodRange('all', today)).toEqual({})
+  })
+})
+
+describe('periodFromMs', () => {
+  const today = new Date(2026, 6, 13)
+
+  it("'7d'는 lastNDaysRange(7).from 자정(로컬)의 epoch ms", () => {
+    expect(periodFromMs('7d', today)).toBe(new Date(2026, 6, 7).getTime())
+  })
+
+  it("'all'은 0(경계 없음)", () => {
+    expect(periodFromMs('all', today)).toBe(0)
+  })
+
+  it("'30d'/'90d'도 lastNDaysRange(n).from 자정의 epoch ms", () => {
+    expect(periodFromMs('30d', today)).toBe(new Date(2026, 5, 14).getTime())
+    expect(periodFromMs('90d', today)).toBe(new Date(2026, 3, 15).getTime())
   })
 })
 

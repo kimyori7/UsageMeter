@@ -385,6 +385,13 @@ body {
   background: var(--color-codex);
 }
 
+.overview-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-faint);
+  margin: 16px 0 8px;
+}
+
 /* ── 일별 기록 탭 ─────────────────────────────────────────────────── */
 
 .daily-tab {
