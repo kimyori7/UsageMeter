@@ -14,7 +14,9 @@ export const {
   queryFolders,
   queryFolderSessions,
   queryMonthly,
-  querySnapshots
+  querySnapshots,
+  getSettings,
+  setSettings
 } = window.usagemeter
 
 /**

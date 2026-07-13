@@ -4,6 +4,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { CHANNELS } from '../shared/channels'
 import type { AppState } from '../main/poller'
+import type { Settings } from '../main/settings'
 import type {
   dailyTotals,
   folderRollup,
@@ -44,7 +45,11 @@ const usagemeter = {
     ipcRenderer.invoke(CHANNELS.queryFolderSessions, folder, opts),
   queryMonthly: (): Promise<MonthlyRow[]> => ipcRenderer.invoke(CHANNELS.queryMonthly),
   querySnapshots: (opts: SnapshotOpts): Promise<SnapshotPoint[]> =>
-    ipcRenderer.invoke(CHANNELS.querySnapshots, opts)
+    ipcRenderer.invoke(CHANNELS.querySnapshots, opts),
+  getSettings: (): Promise<Settings> => ipcRenderer.invoke(CHANNELS.settingsGet),
+  /** 저장 후 main이 clamp한 실제 반영값을 돌려준다(설정 화면의 낙관적 업데이트 오차 방지). */
+  setSettings: (settings: Settings): Promise<Settings> =>
+    ipcRenderer.invoke(CHANNELS.settingsSet, settings)
 }
 
 export type UsagemeterApi = typeof usagemeter

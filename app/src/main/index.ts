@@ -10,6 +10,7 @@ import { Windows } from './windows'
 import { formatTooltip } from './tooltip'
 import { registerIpc } from './ipc'
 import { Poller, type AppState } from './poller'
+import { loadSettings } from './settings'
 import { runCcusage } from './ccusage-runner'
 import { openDb } from '../store/db'
 import { upsertDaily } from '../store/daily'
@@ -47,19 +48,25 @@ function boot(): void {
   const db = openDb(join(app.getPath('userData'), 'usage.db'))
   const codexCwdOf = makeCwdResolver()
 
-  poller = new Poller({
-    db,
-    fetchClaudeLimits,
-    readCodexLimits,
-    runCcusage,
-    normalizeDaily,
-    normalizeSessions,
-    codexCwdOf,
-    upsertDaily,
-    upsertSessions,
-    recordSnapshots,
-    todayByProvider
-  })
+  // 설정 화면(Task 11)의 폴링 주기는 실행 중 실시간 반영하지 않고(YAGNI), 부팅 시 여기서 1회 읽어
+  // Poller 생성 인자로 넘긴다 — SettingsPane의 "재시작 후 적용" 안내 문구가 실제로 참이 되도록.
+  const settings = loadSettings()
+  poller = new Poller(
+    {
+      db,
+      fetchClaudeLimits,
+      readCodexLimits,
+      runCcusage,
+      normalizeDaily,
+      normalizeSessions,
+      codexCwdOf,
+      upsertDaily,
+      upsertSessions,
+      recordSnapshots,
+      todayByProvider
+    },
+    { limitsMs: settings.limitsIntervalSec * 1000, usageMs: settings.usageIntervalMin * 60_000 }
+  )
   poller.on('state', (state: AppState) => {
     tray?.setToolTip(formatTooltip(state))
   })

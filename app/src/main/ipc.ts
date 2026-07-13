@@ -13,6 +13,7 @@ import {
   sessionsInFolder,
   snapshotSeries
 } from '../store/queries'
+import { loadSettings, saveSettings, type Settings } from './settings'
 
 export interface IpcDeps {
   db: Database.Database
@@ -54,6 +55,12 @@ export function registerIpc(deps: IpcDeps): void {
   ipcMain.handle(CHANNELS.querySnapshots, (_event, opts: Parameters<typeof snapshotSeries>[1]) =>
     snapshotSeries(db, opts)
   )
+
+  ipcMain.handle(CHANNELS.settingsGet, () => loadSettings())
+  ipcMain.handle(CHANNELS.settingsSet, (_event, settings: Settings) => {
+    saveSettings(settings)
+    return loadSettings() // clamp된 실제 저장값을 돌려준다 — 렌더러가 낙관적 업데이트로 오차값을 갖지 않도록.
+  })
 
   // 폴러는 매 틱(limits 60s / usage 5min)마다 'state' 이벤트를 낸다 — 변경 감지 없이 매번 push한다.
   // (렌더러 재렌더 비용은 낮고, dedup은 이번 태스크 범위 밖 — 필요해지면 이전 상태와 얕은 비교 추가.)

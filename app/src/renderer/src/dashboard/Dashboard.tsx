@@ -9,6 +9,7 @@ import OverviewTab from './OverviewTab'
 import DailyTab from './DailyTab'
 import FoldersTab from './FoldersTab'
 import MonthlyTab from './MonthlyTab'
+import SettingsPane from './SettingsPane'
 import type { Period } from './period'
 import type { ProviderId } from '../../../providers/types'
 
@@ -71,10 +72,7 @@ export default function Dashboard(): React.JSX.Element {
                 프로바이더 기준 리포트를 보여준다. providers 상태를 여기서 넘기지 않는 건 실수가
                 아니라 의도적 단순화: 필터 UI 없이 다른 탭의 토글 상태를 몰래 상속하면 더 헷갈린다. */}
             {activeTab === 'monthly' && <MonthlyTab />}
-            {/* 설정은 다음 커밋에서 채운다. */}
-            {activeTab === 'settings' && (
-              <div className="dashboard-empty">이 탭은 다음 커밋에서 구현됩니다.</div>
-            )}
+            {activeTab === 'settings' && <SettingsPane />}
           </>
         )}
       </div>
