@@ -37,6 +37,11 @@ function quit(): void {
 }
 
 function boot(): void {
+  // 기본 부팅도 트레이만 띄우고 창은 자동으로 열지 않는다(Step4 수동검증 흐름과 일치) — 따라서
+  // --start-minimized는 현재 동작상 no-op이지만, 자동시작(Task 11) 설정과의 인자 계약은 유지해 둔다.
+  if (startMinimized) {
+    console.log('[UsageMeter] started with --start-minimized (tray-only boot, same as default)')
+  }
   // DB 경로: 스펙/브리프에 파일명이 명시돼 있지 않아 usage.db로 정함 (task-8-report.md에 플래그).
   const db = openDb(join(app.getPath('userData'), 'usage.db'))
   const codexCwdOf = makeCwdResolver()
@@ -66,10 +71,6 @@ function boot(): void {
   })
 
   poller.start()
-
-  if (!startMinimized) {
-    windows.showDashboard()
-  }
 }
 
 const gotLock = app.requestSingleInstanceLock()
