@@ -5,7 +5,7 @@
 // sessionsInFolder에 새로 추가한 from/to로 적용한다(store/queries.ts 변경 — 스코프 노트: 대시보드 셸의
 // 기간 칩이 폴더 탭에도 실제로 적용되게 하려면 필요했다. queries.test.ts에 기존 케이스를 건드리지 않고
 // 케이스만 추가했다).
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { queryFolders, queryFolderSessions } from '../api'
 import { mergeFolderSplits, type FolderSplitRow } from './folderSplit'
 import { sessionLabel } from './sessionLabel'
@@ -34,6 +34,11 @@ export default function FoldersTab({ period, providers }: FoldersTabProps): Reac
   const [rows, setRows] = useState<FolderSplitRow[]>([])
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const [sessionsByFolder, setSessionsByFolder] = useState<Record<string, SessionRow[]>>({})
+  // 필터(period/providers) 세대 카운터 — 필터가 바뀔 때마다 effect 클린업에서 +1 된다.
+  // 세션 펼침 fetch는 요청 시점의 세대를 캡처해 두고, 응답이 왔을 때 세대가 달라져 있으면 버린다.
+  // 이 가드가 없으면: 펼침 → 기간 칩 변경 → effect가 sessionsByFolder를 {}로 리셋 → 그 뒤에 이전
+  // 기간의 fetch가 늦게 도착해 캐시를 오염시키고, 캐시 히트 검사 때문에 재조회도 막힌다(리뷰 지적).
+  const filterEpoch = useRef(0)
 
   useEffect(() => {
     let cancelled = false
@@ -53,24 +58,26 @@ export default function FoldersTab({ period, providers }: FoldersTabProps): Reac
 
     return () => {
       cancelled = true
+      filterEpoch.current += 1 // 이 필터 세대에 떠 있는 세션 fetch 응답을 전부 무효화
     }
   }, [period, providers])
 
   function toggleFolder(folder: string): void {
+    const isOpen = expanded.has(folder)
     setExpanded((prev) => {
       const next = new Set(prev)
-      if (next.has(folder)) {
-        next.delete(folder)
-        return next
-      }
-      next.add(folder)
-      if (!sessionsByFolder[folder]) {
-        const range = periodRange(period)
-        queryFolderSessions(folder, { ...range, providers }).then((sessions) => {
-          setSessionsByFolder((prevSessions) => ({ ...prevSessions, [folder]: sessions }))
-        })
-      }
+      if (isOpen) next.delete(folder)
+      else next.add(folder)
       return next
+    })
+    if (isOpen || sessionsByFolder[folder]) return
+    // fetch는 updater 밖에서 — setState updater는 순수해야 하고(StrictMode에서 두 번 실행돼
+    // 중복 fetch가 됨), 여기서 세대를 캡처해 늦게 온 응답이 새 필터의 캐시를 오염시키지 않게 한다.
+    const epoch = filterEpoch.current
+    const range = periodRange(period)
+    queryFolderSessions(folder, { ...range, providers }).then((sessions) => {
+      if (filterEpoch.current !== epoch) return // 응답 대기 중 필터가 바뀜 — 이전 기간의 세션, 폐기
+      setSessionsByFolder((prevSessions) => ({ ...prevSessions, [folder]: sessions }))
     })
   }
 

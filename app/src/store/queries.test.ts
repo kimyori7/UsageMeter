@@ -145,14 +145,33 @@ describe('queries', () => {
     })
   })
 
-  it('folderRollup: from/to로 세션 종료일(ended_at) 기준 기간 필터링(양끝 포함)', () => {
+  // from/to는 로컬 캘린더 일 기준이다 — 기대값은 KST 등 특정 tz를 하드코딩하지 않고, 테스트가 도는
+  // 환경의 tz로 UTC 타임스탬프를 JS Date 로컬 게터로 변환해(아래 localDay) 도출한다. 그래야 어느
+  // 머신에서든 통과하면서, SQL 쪽이 UTC 일을 추출하는 버그(로컬 일 ≠ UTC 일인 시각대)에선 실패한다.
+  function localDay(iso: string): string {
+    const d = new Date(iso)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+      d.getDate()
+    ).padStart(2, '0')}`
+  }
+  function shiftDay(day: string, delta: number): string {
+    const [y, m, dd] = day.split('-').map(Number)
+    const d = new Date(y, m - 1, dd + delta)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+      d.getDate()
+    ).padStart(2, '0')}`
+  }
+
+  it('folderRollup: from/to로 세션 종료일(ended_at, 로컬 일) 기준 기간 필터링(양끝 포함)', () => {
+    const d1End = '2026-07-01T10:00:00Z'
+    const d2End = '2026-07-10T23:59:00Z'
     upsertSessions(db, [
       {
         sessionId: 'd1',
         provider: 'claude',
         folder: 'dated',
         startedAt: null,
-        endedAt: '2026-07-01T10:00:00Z',
+        endedAt: d1End,
         totalTokens: 10,
         costUsd: 1
       },
@@ -161,28 +180,32 @@ describe('queries', () => {
         provider: 'claude',
         folder: 'dated',
         startedAt: null,
-        endedAt: '2026-07-10T23:59:00Z',
+        endedAt: d2End,
         totalTokens: 20,
         costUsd: 2
       }
     ])
 
-    const inRange = folderRollup(db, { from: '2026-07-05', to: '2026-07-10' })
-    const dated = inRange.find((r) => r.folder === 'dated')
-    expect(dated?.costUsd).toBe(2) // d2만(경계 07-10 포함), d1은 범위 밖
+    const d2Only = folderRollup(db, { from: localDay(d2End), to: localDay(d2End) })
+    expect(d2Only.find((r) => r.folder === 'dated')?.costUsd).toBe(2)
+
+    const d1Only = folderRollup(db, { from: localDay(d1End), to: localDay(d1End) })
+    expect(d1Only.find((r) => r.folder === 'dated')?.costUsd).toBe(1)
 
     const noFilter = folderRollup(db)
     expect(noFilter.find((r) => r.folder === 'dated')?.costUsd).toBe(3) // 필터 없으면 기존 동작 그대로
   })
 
   it('sessionsInFolder: from/to 기간 필터링', () => {
+    const e1End = '2026-06-01T12:00:00Z'
+    const e2End = '2026-07-01T12:00:00Z'
     upsertSessions(db, [
       {
         sessionId: 'e1',
         provider: 'claude',
         folder: 'dated2',
         startedAt: null,
-        endedAt: '2026-06-01T00:00:00Z',
+        endedAt: e1End,
         totalTokens: 1,
         costUsd: 1
       },
@@ -191,14 +214,44 @@ describe('queries', () => {
         provider: 'claude',
         folder: 'dated2',
         startedAt: null,
-        endedAt: '2026-07-01T00:00:00Z', // to 경계값과 정확히 같은 날 — 포함돼야 함
+        endedAt: e2End, // from 경계값과 정확히 같은 날 — 포함돼야 함
         totalTokens: 1,
         costUsd: 1
       }
     ])
 
-    const rows = sessionsInFolder(db, 'dated2', { from: '2026-07-01', to: '2026-07-31' })
+    const rows = sessionsInFolder(db, 'dated2', { from: localDay(e2End), to: localDay(e2End) })
     expect(rows.map((r) => r.sessionId)).toEqual(['e2'])
+  })
+
+  it('from/to는 로컬 캘린더 일 기준 — UTC 일과 로컬 일이 다른 시각의 세션도 로컬 일 창에 잡힌다', () => {
+    // 20:00Z: UTC+5 이상(KST 포함)에선 로컬 일이 UTC 일의 다음 날이 되는 시각.
+    // 음수 오프셋/UTC 머신에선 로컬 일 == UTC 일이지만, 아래 단언은 어느 쪽에서든 성립한다
+    // (로컬 일 창에 포함 + 앞뒤 날 창에서 제외 — SQL이 UTC 일을 추출하면 KST류 머신에서 실패).
+    const boundaryEnd = '2026-07-09T20:00:00Z'
+    upsertSessions(db, [
+      {
+        sessionId: 'tz1',
+        provider: 'claude',
+        folder: 'tzcheck',
+        startedAt: null,
+        endedAt: boundaryEnd,
+        totalTokens: 1,
+        costUsd: 1
+      }
+    ])
+    const day = localDay(boundaryEnd)
+
+    const hit = sessionsInFolder(db, 'tzcheck', { from: day, to: day })
+    expect(hit.map((r) => r.sessionId)).toEqual(['tz1'])
+
+    const prevDay = shiftDay(day, -1)
+    expect(sessionsInFolder(db, 'tzcheck', { from: prevDay, to: prevDay })).toEqual([])
+    const nextDay = shiftDay(day, 1)
+    expect(sessionsInFolder(db, 'tzcheck', { from: nextDay, to: nextDay })).toEqual([])
+
+    const rollupHit = folderRollup(db, { from: day, to: day })
+    expect(rollupHit.find((r) => r.folder === 'tzcheck')?.costUsd).toBe(1)
   })
 
   it('monthlyRollup: date를 substr(date,1,7)로 월별 그룹핑', () => {

@@ -76,10 +76,14 @@ export function todayByProvider(
 // 1원 단위로 정확히 일치하지는 않는다(폴더·세션 탭은 세션 단위 특성상 의도된 차이).
 interface FolderQueryOpts {
   providers?: ProviderId[]
-  from?: string // YYYY-MM-DD, date(ended_at) >= from (포함)
-  to?: string // YYYY-MM-DD, date(ended_at) <= to (포함) — date()로 시각 성분을 제거해 경계일을 포함시킨다
+  from?: string // YYYY-MM-DD(로컬 일), date(ended_at,'localtime') >= from (포함)
+  to?: string // YYYY-MM-DD(로컬 일), date(ended_at,'localtime') <= to (포함)
 }
 
+// 'localtime' 변환이 필수인 이유: ended_at은 Z 접미사 UTC 타임스탬프인데, from/to는 렌더러
+// (dashboard/period.ts)가 로컬 Date 게터로 만든 로컬 캘린더 일이다. 앱의 나머지 일 단위 데이터도
+// 전부 로컬 기준(ccusage daily 버킷, poller의 todayDateString) — 변환 없이 date()로 UTC 일을
+// 추출하면 KST(UTC+9) 같은 양수 오프셋에서 자정~09시 종료 세션이 폴더 탭에서만 전날로 밀린다.
 function dateRangeFilter(opts: Pick<FolderQueryOpts, 'from' | 'to'>): {
   clauses: string[]
   params: string[]
@@ -87,11 +91,11 @@ function dateRangeFilter(opts: Pick<FolderQueryOpts, 'from' | 'to'>): {
   const clauses: string[] = []
   const params: string[] = []
   if (opts.from) {
-    clauses.push('date(ended_at) >= ?')
+    clauses.push("date(ended_at, 'localtime') >= ?")
     params.push(opts.from)
   }
   if (opts.to) {
-    clauses.push('date(ended_at) <= ?')
+    clauses.push("date(ended_at, 'localtime') <= ?")
     params.push(opts.to)
   }
   return { clauses, params }

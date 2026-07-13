@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -66,5 +66,23 @@ describe('settings', () => {
   it('너무 작은 간격 값은 최소치로 clamp되어 저장/로드됨 (폴러 폭주 방지)', () => {
     saveSettings({ autoStart: false, limitsIntervalSec: 0, usageIntervalMin: 0 })
     expect(loadSettings()).toEqual({ autoStart: false, limitsIntervalSec: 15, usageIntervalMin: 1 })
+  })
+
+  it('세터에 잘못된 타입(문자열/NaN)이 와도 파일·setLoginItemSettings 모두 정규화된 값만 받는다', () => {
+    // IPC payload는 컴파일 타임 보장이 없다(렌더러가 뭘 보내든 런타임엔 unknown) — 저장 경로도
+    // loadSettings와 같은 typeof 내로잉을 거쳐야 NaN→null(JSON 직렬화)·불리언 아닌 openAtLogin이 안 샌다.
+    saveSettings({
+      autoStart: 'yes',
+      limitsIntervalSec: 'abc',
+      usageIntervalMin: NaN
+    } as unknown as Parameters<typeof saveSettings>[0])
+
+    const persisted = JSON.parse(readFileSync(join(dir, 'settings.json'), 'utf-8'))
+    expect(persisted).toEqual({ autoStart: false, limitsIntervalSec: 60, usageIntervalMin: 5 })
+    expect(setLoginItemSettings).toHaveBeenLastCalledWith({
+      openAtLogin: false,
+      args: ['--start-minimized']
+    })
+    expect(loadSettings()).toEqual({ autoStart: false, limitsIntervalSec: 60, usageIntervalMin: 5 })
   })
 })

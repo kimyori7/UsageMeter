@@ -19,11 +19,26 @@ const DEFAULT_SETTINGS: Settings = { autoStart: false, limitsIntervalSec: 60, us
 const MIN_LIMITS_INTERVAL_SEC = 15
 const MIN_USAGE_INTERVAL_MIN = 1
 
-function clamp(s: Settings): Settings {
+/**
+ * typeof 내로잉 + 기본값 대체 + 최소치 clamp를 한 곳에서 수행한다. 로드(디스크의 손상 가능 JSON)와
+ * 저장(렌더러발 IPC payload — 컴파일 타임 보장 없음, 런타임엔 사실상 unknown) 양쪽 경로가 반드시
+ * 이 함수를 통과한다. 안 그러면 문자열 autoStart가 setLoginItemSettings에 그대로 새거나
+ * Math.round('abc')=NaN이 JSON에서 null로 직렬화돼 다음 로드까지 오염이 이어진다.
+ */
+function normalize(raw: Partial<Record<keyof Settings, unknown>>): Settings {
+  const autoStart = typeof raw.autoStart === 'boolean' ? raw.autoStart : DEFAULT_SETTINGS.autoStart
+  const limitsIntervalSec =
+    typeof raw.limitsIntervalSec === 'number' && Number.isFinite(raw.limitsIntervalSec)
+      ? raw.limitsIntervalSec
+      : DEFAULT_SETTINGS.limitsIntervalSec
+  const usageIntervalMin =
+    typeof raw.usageIntervalMin === 'number' && Number.isFinite(raw.usageIntervalMin)
+      ? raw.usageIntervalMin
+      : DEFAULT_SETTINGS.usageIntervalMin
   return {
-    autoStart: s.autoStart,
-    limitsIntervalSec: Math.max(MIN_LIMITS_INTERVAL_SEC, Math.round(s.limitsIntervalSec)),
-    usageIntervalMin: Math.max(MIN_USAGE_INTERVAL_MIN, Math.round(s.usageIntervalMin))
+    autoStart,
+    limitsIntervalSec: Math.max(MIN_LIMITS_INTERVAL_SEC, Math.round(limitsIntervalSec)),
+    usageIntervalMin: Math.max(MIN_USAGE_INTERVAL_MIN, Math.round(usageIntervalMin))
   }
 }
 
@@ -33,29 +48,17 @@ function settingsPath(): string {
 
 export function loadSettings(): Settings {
   try {
-    const raw = readFileSync(settingsPath(), 'utf-8')
-    const parsed = JSON.parse(raw) as Partial<Settings>
-    return clamp({
-      autoStart:
-        typeof parsed.autoStart === 'boolean' ? parsed.autoStart : DEFAULT_SETTINGS.autoStart,
-      limitsIntervalSec:
-        typeof parsed.limitsIntervalSec === 'number'
-          ? parsed.limitsIntervalSec
-          : DEFAULT_SETTINGS.limitsIntervalSec,
-      usageIntervalMin:
-        typeof parsed.usageIntervalMin === 'number'
-          ? parsed.usageIntervalMin
-          : DEFAULT_SETTINGS.usageIntervalMin
-    })
+    // JSON.parse 결과가 null/배열/문자열이어도 normalize의 프로퍼티 접근이 throw하면 catch로 폴백.
+    return normalize(JSON.parse(readFileSync(settingsPath(), 'utf-8')))
   } catch {
     return { ...DEFAULT_SETTINGS }
   }
 }
 
 export function saveSettings(s: Settings): void {
-  const clamped = clamp(s)
+  const normalized = normalize(s)
   const dir = app.getPath('userData')
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-  writeFileSync(join(dir, 'settings.json'), JSON.stringify(clamped, null, 2))
-  app.setLoginItemSettings({ openAtLogin: clamped.autoStart, args: ['--start-minimized'] })
+  writeFileSync(join(dir, 'settings.json'), JSON.stringify(normalized, null, 2))
+  app.setLoginItemSettings({ openAtLogin: normalized.autoStart, args: ['--start-minimized'] })
 }
