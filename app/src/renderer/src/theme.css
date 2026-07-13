@@ -202,10 +202,462 @@ body {
   opacity: 0.5;
 }
 
-/* ── 대시보드 (Task 11에서 실제 구현 — 지금은 최소 placeholder) ──────── */
+/* ── 대시보드 (Task 11) ─────────────────────────────────────────────── */
+/* html,body의 overflow:hidden(팝업용)은 그대로 두고, 대시보드는 내부(.dashboard-body)만 스크롤한다. */
 
-.dashboard-placeholder {
-  padding: 40px;
+.dashboard {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  user-select: text; /* 팝업(body 기본값 none)과 달리 금액/경로를 복사할 수 있어야 한다 */
+}
+
+.dashboard-tabs {
+  display: flex;
+  gap: 2px;
+  background: #111118;
+  padding: 8px 10px 0;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.dashboard-tab {
+  padding: 6px 14px;
+  border-radius: 8px 8px 0 0;
+  color: var(--color-text-faint);
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.dashboard-tab--on {
+  background: var(--color-card-bg);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.dashboard-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+.dashboard-filters {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.dashboard-filters-spacer {
+  flex: 1;
+}
+
+.dashboard-empty,
+.folders-empty,
+.monthly-empty {
+  padding: 30px 0;
   text-align: center;
   color: var(--color-text-faint);
+  font-size: 12px;
+}
+
+/* ── 칩(기간/프로바이더 토글) — 목업 dashboard.html의 .chip 그대로 ──── */
+
+.chip {
+  border: 1px solid #3a3a4e;
+  border-radius: 10px;
+  padding: 2px 9px;
+  color: var(--color-text-faint);
+  background: none;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chip--on {
+  background: #2a2a3e;
+  color: var(--color-text);
+}
+
+.chips {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+/* ── 개요 탭: StatCard 3개 + 차트 ─────────────────────────────────── */
+
+.stat-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border-soft);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.stat-card-label {
+  font-size: 11px;
+  color: var(--color-text-faint);
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.stat-provider-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.stat-provider-row:last-child {
+  margin-bottom: 0;
+}
+
+.stat-provider-row b {
+  margin-left: auto;
+  font-size: 15px;
+}
+
+.usage-chart {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border-soft);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.chart-empty {
+  padding: 40px 0;
+  text-align: center;
+  color: var(--color-text-faint);
+  font-size: 12px;
+}
+
+.chart-tooltip {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border-soft);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--color-text);
+}
+
+.chart-tooltip-date {
+  color: var(--color-text-faint);
+  margin-bottom: 4px;
+}
+
+.chart-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chart-tooltip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.chart-tooltip-dot--claude {
+  background: var(--color-claude);
+}
+
+.chart-tooltip-dot--codex {
+  background: var(--color-codex);
+}
+
+/* ── 일별 기록 탭 ─────────────────────────────────────────────────── */
+
+.daily-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.daily-table-wrap {
+  overflow-x: auto;
+}
+
+.daily-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.daily-table th,
+.daily-table td {
+  padding: 6px 8px;
+  text-align: right;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.daily-table th:first-child,
+.daily-table td:first-child {
+  text-align: left;
+}
+
+.daily-table thead th {
+  color: var(--color-text-faint);
+  font-weight: 600;
+}
+
+.daily-table-empty {
+  text-align: center;
+  color: var(--color-text-faint);
+  padding: 20px 0;
+}
+
+/* ── 폴더·세션 탭 — 목업 dashboard.html의 .frow/.dot/.fbar 그대로 ──── */
+
+.folders-tab {
+  display: flex;
+  flex-direction: column;
+}
+
+.frow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 8px;
+  border-radius: 7px;
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border-soft);
+  margin-bottom: 5px;
+}
+
+.frow:not(.child) {
+  cursor: pointer;
+}
+
+.frow.child {
+  margin-left: 22px;
+  background: #1a1a24;
+  border-color: transparent;
+  padding: 5px 8px;
+}
+
+.caret {
+  color: #6b6b7e;
+  width: 10px;
+  flex-shrink: 0;
+  font-size: 10px;
+}
+
+.fname {
+  flex: 1;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.frow.child .fname {
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.folders-loading {
+  color: var(--color-text-faint) !important;
+  font-weight: 400 !important;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 8px;
+}
+
+.dot--claude {
+  background: var(--color-claude);
+}
+
+.dot--codex {
+  background: var(--color-codex);
+}
+
+.dot--both {
+  background: linear-gradient(90deg, #d97757 50%, #19c37d 50%);
+}
+
+.fcost {
+  font-weight: 600;
+  min-width: 52px;
+  text-align: right;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.ftok {
+  color: #6b6b7e;
+  min-width: 64px;
+  text-align: right;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.fbar {
+  flex: 0 0 90px;
+  height: 5px;
+  background: var(--color-border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.fbar i {
+  display: block;
+  height: 100%;
+}
+
+/* ── 월 리포트 탭 ─────────────────────────────────────────────────── */
+
+.monthly-tab {
+  display: flex;
+  flex-direction: column;
+}
+
+.month-card {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border-soft);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.month-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.month-card-title {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.month-card-total {
+  color: var(--color-text-faint);
+  font-size: 12px;
+}
+
+.month-card-change {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+
+.month-card-change--up {
+  color: var(--color-warn);
+}
+
+.month-card-change--down {
+  color: var(--color-codex-light);
+}
+
+.month-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.month-table th,
+.month-table td {
+  padding: 4px 8px;
+  text-align: right;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.month-table th:first-child,
+.month-table td:first-child,
+.month-table th:nth-child(2),
+.month-table td:nth-child(2) {
+  text-align: left;
+}
+
+/* ── 설정 화면 ────────────────────────────────────────────────────── */
+
+.settings-pane {
+  max-width: 420px;
+}
+
+.settings-loading {
+  color: var(--color-text-faint);
+  padding: 20px 0;
+}
+
+.settings-row {
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.settings-label {
+  font-size: 12px;
+  color: var(--color-text-faint);
+}
+
+.settings-row input[type='number'] {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-soft);
+  border-radius: 6px;
+  color: var(--color-text);
+  padding: 6px 8px;
+  width: 100px;
+  font: inherit;
+}
+
+.settings-note {
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+
+.settings-actions {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-save {
+  background: var(--color-claude);
+  color: #16161e;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 16px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.settings-saved {
+  color: var(--color-codex-light);
+  font-size: 12px;
 }
