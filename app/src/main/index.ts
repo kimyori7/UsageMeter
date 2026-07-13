@@ -1,74 +1,100 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
-import { join } from 'path'
-import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import icon from '../../resources/icon.png?asset'
+// 부팅 배선: 단일 인스턴스 락 → DB/폴러 구성 → 트레이 생성 → (기본) 대시보드 표시.
+// --start-minimized(자동시작 인자, settings.ts에서 로그인 시 전달)면 창 없이 트레이만 띄운다.
+// v1과 달리 단일 프로세스 이벤트 루프라 스레드 데드락 걱정이 없다 — 종료는 tray.destroy() → app.quit()로 충분.
+import { app } from 'electron'
+import type { Tray } from 'electron'
+import { join } from 'node:path'
+import { electronApp, optimizer } from '@electron-toolkit/utils'
+import { createTray } from './tray'
+import { Windows } from './windows'
+import { formatTooltip } from './tooltip'
+import { Poller, type AppState } from './poller'
+import { runCcusage } from './ccusage-runner'
+import { openDb } from '../store/db'
+import { upsertDaily } from '../store/daily'
+import { upsertSessions } from '../store/sessions'
+import { recordSnapshots } from '../store/snapshots'
+import { todayByProvider } from '../store/queries'
+import { fetchClaudeLimits } from '../providers/claude/limits'
+import { readCodexLimits } from '../providers/codex/limits'
+import { normalizeDaily, normalizeSessions } from '../providers/usage-normalizer'
+import { makeCwdResolver } from '../providers/codex/cwd'
 
-function createWindow(): void {
-  // Create the browser window.
-  const mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
-    show: false,
-    autoHideMenuBar: true,
-    ...(process.platform === 'linux' ? { icon } : {}),
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
-    }
+const startMinimized = process.argv.includes('--start-minimized')
+
+let tray: Tray | null = null
+const windows = new Windows(() => {
+  if (!tray) throw new Error('tray not initialized')
+  return tray.getBounds()
+})
+let poller: Poller | null = null
+
+function quit(): void {
+  poller?.stop()
+  windows.destroyAll()
+  tray?.destroy()
+  app.quit()
+}
+
+function boot(): void {
+  // DB 경로: 스펙/브리프에 파일명이 명시돼 있지 않아 usage.db로 정함 (task-8-report.md에 플래그).
+  const db = openDb(join(app.getPath('userData'), 'usage.db'))
+  const codexCwdOf = makeCwdResolver()
+
+  poller = new Poller({
+    db,
+    fetchClaudeLimits,
+    readCodexLimits,
+    runCcusage,
+    normalizeDaily,
+    normalizeSessions,
+    codexCwdOf,
+    upsertDaily,
+    upsertSessions,
+    recordSnapshots,
+    todayByProvider
+  })
+  poller.on('state', (state: AppState) => {
+    tray?.setToolTip(formatTooltip(state))
   })
 
-  mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
+  tray = createTray({
+    onOpenPopup: () => windows.showPopup(),
+    onOpenDashboard: () => windows.showDashboard(),
+    onRefresh: () => void poller?.refreshNow(),
+    onQuit: () => quit()
   })
 
-  mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
-    return { action: 'deny' }
-  })
+  poller.start()
 
-  // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
-  } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+  if (!startMinimized) {
+    windows.showDashboard()
   }
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
-  // Set app user model id for windows
-  electronApp.setAppUserModelId('com.electron')
-
-  // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl + R in production.
-  // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
+const gotLock = app.requestSingleInstanceLock()
+if (!gotLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    windows.showPopup()
   })
 
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
+  // 트레이 상주 앱: 모든 창이 닫혀도(대시보드 닫기 등) 앱은 종료하지 않는다 — 종료는 트레이 메뉴로만.
+  app.on('window-all-closed', () => {})
 
-  createWindow()
-
-  app.on('activate', function () {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
-  })
-})
-
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
-})
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.
+  app
+    .whenReady()
+    .then(() => {
+      electronApp.setAppUserModelId('cc.kimyori.usagemeter')
+      app.on('browser-window-created', (_, window) => {
+        optimizer.watchWindowShortcuts(window)
+      })
+      boot()
+    })
+    .catch((err: unknown) => {
+      // boot() 실패(DB 오픈 등)를 삼키지 않는다 — 안 그러면 트레이도 창도 없는 유령 프로세스로 남는다.
+      console.error('[UsageMeter] boot failed:', err)
+      app.quit()
+    })
+}
