@@ -16,7 +16,7 @@ function win(kind: RateWindow['kind'], raw: unknown): RateWindow | null {
 }
 
 export async function fetchClaudeLimits(
-  deps: { token?: string | null; fetchFn?: typeof fetch } = {},
+  deps: { token?: string | null; fetchFn?: typeof fetch } = {}
 ): Promise<RateStatus> {
   const token = deps.token !== undefined ? deps.token : readAccessToken()
   const fetchFn = deps.fetchFn ?? fetch
@@ -26,7 +26,7 @@ export async function fetchClaudeLimits(
   let res: Response
   try {
     res = await fetchFn(USAGE_URL, {
-      headers: { Authorization: `Bearer ${token}`, 'anthropic-beta': 'oauth-2025-04-20' },
+      headers: { Authorization: `Bearer ${token}`, 'anthropic-beta': 'oauth-2025-04-20' }
     })
   } catch {
     return { ...base, error: 'network' }
@@ -34,18 +34,19 @@ export async function fetchClaudeLimits(
   if (res.status === 401 || res.status === 403) return { ...base, error: 'unauthorized' }
   if (!res.ok) return { ...base, error: 'network' }
 
-  const body = (await res.json()) as {
-    five_hour?: unknown
-    seven_day?: unknown
-    subscriptionType?: string
+  let body: { five_hour?: unknown; seven_day?: unknown; subscriptionType?: string }
+  try {
+    body = await res.json()
+  } catch {
+    return { ...base, error: 'network' }
   }
   const windows = [win('session_5h', body.five_hour), win('weekly', body.seven_day)].filter(
-    (w): w is RateWindow => w !== null,
+    (w): w is RateWindow => w !== null
   )
   return {
     ...base,
     windows,
     plan: body.subscriptionType ?? undefined,
-    ...(windows.length === 0 ? { error: 'no-data' as const } : {}),
+    ...(windows.length === 0 ? { error: 'no-data' as const } : {})
   }
 }
