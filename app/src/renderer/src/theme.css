@@ -595,10 +595,10 @@ body {
   text-align: left;
 }
 
-/* ── 설정 화면 ────────────────────────────────────────────────────── */
+/* ── 설정 화면 — 앱 공통 카드 언어(#1e1e2a 카드 + 섹션 그룹) ────────── */
 
 .settings-pane {
-  max-width: 420px;
+  max-width: 480px;
 }
 
 .settings-loading {
@@ -606,44 +606,131 @@ body {
   padding: 20px 0;
 }
 
-.settings-row {
-  margin-bottom: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.settings-card {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 18px 20px;
 }
 
-.settings-checkbox-label {
+.settings-section + .settings-section {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.settings-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 10px;
+}
+
+/* 토글 행: 라벨 왼쪽, 스위치 오른쪽 — 행 전체가 클릭 영역(label). */
+.settings-toggle-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
   font-size: 13px;
+  cursor: pointer;
 }
 
-.settings-label {
-  font-size: 12px;
-  color: var(--color-text-faint);
+/* 기본 체크박스를 앱 액센트 색 스위치로 재그리기(appearance:none + 트랙/노브). */
+.settings-toggle {
+  appearance: none;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--color-border);
+  border: 1px solid #3a3a4e;
+  position: relative;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+  flex-shrink: 0;
+  margin: 0;
 }
 
-.settings-row input[type='number'] {
+.settings-toggle::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease;
+}
+
+.settings-toggle:checked {
+  background: var(--color-claude);
+  border-color: var(--color-claude);
+}
+
+.settings-toggle:checked::before {
+  transform: translateX(16px);
+  background: #16161e;
+}
+
+.settings-toggle:focus-visible {
+  outline: 2px solid var(--color-claude-light);
+  outline-offset: 2px;
+}
+
+/* 필드 행: 라벨 왼쪽, 입력+단위 오른쪽. */
+.settings-field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.settings-input-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-input-wrap input[type='number'] {
   background: var(--color-bg);
-  border: 1px solid var(--color-border-soft);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   color: var(--color-text);
   padding: 6px 8px;
-  width: 100px;
+  width: 76px;
   font: inherit;
+  font-size: 13px;
+  text-align: right;
+}
+
+.settings-input-wrap input[type='number']:focus-visible {
+  outline: 2px solid var(--color-claude-light);
+  outline-offset: 1px;
+}
+
+.settings-unit {
+  font-size: 12px;
+  color: var(--color-text-faint);
+  width: 16px;
 }
 
 .settings-note {
   font-size: 11px;
   color: var(--color-text-faint);
+  margin: 4px 0 0;
 }
 
 .settings-actions {
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
 }
 
 .settings-save {
@@ -651,13 +738,19 @@ body {
   color: #16161e;
   border: none;
   border-radius: 8px;
-  padding: 6px 16px;
+  padding: 7px 18px;
   font: inherit;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  transition: background 0.15s ease;
 }
 
-.settings-saved {
-  color: var(--color-codex-light);
-  font-size: 12px;
+.settings-save:hover {
+  background: var(--color-claude-light);
+}
+
+.settings-save--saved,
+.settings-save--saved:hover {
+  background: var(--color-codex);
 }
