@@ -8,6 +8,7 @@ import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { createTray } from './tray'
 import { Windows } from './windows'
 import { formatTooltip } from './tooltip'
+import { registerIpc } from './ipc'
 import { Poller, type AppState } from './poller'
 import { runCcusage } from './ccusage-runner'
 import { openDb } from '../store/db'
@@ -62,6 +63,7 @@ function boot(): void {
   poller.on('state', (state: AppState) => {
     tray?.setToolTip(formatTooltip(state))
   })
+  registerIpc({ db, poller, windows })
 
   tray = createTray({
     onTogglePopup: () => windows.showPopup(),
