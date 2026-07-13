@@ -145,6 +145,62 @@ describe('queries', () => {
     })
   })
 
+  it('folderRollup: from/to로 세션 종료일(ended_at) 기준 기간 필터링(양끝 포함)', () => {
+    upsertSessions(db, [
+      {
+        sessionId: 'd1',
+        provider: 'claude',
+        folder: 'dated',
+        startedAt: null,
+        endedAt: '2026-07-01T10:00:00Z',
+        totalTokens: 10,
+        costUsd: 1
+      },
+      {
+        sessionId: 'd2',
+        provider: 'claude',
+        folder: 'dated',
+        startedAt: null,
+        endedAt: '2026-07-10T23:59:00Z',
+        totalTokens: 20,
+        costUsd: 2
+      }
+    ])
+
+    const inRange = folderRollup(db, { from: '2026-07-05', to: '2026-07-10' })
+    const dated = inRange.find((r) => r.folder === 'dated')
+    expect(dated?.costUsd).toBe(2) // d2만(경계 07-10 포함), d1은 범위 밖
+
+    const noFilter = folderRollup(db)
+    expect(noFilter.find((r) => r.folder === 'dated')?.costUsd).toBe(3) // 필터 없으면 기존 동작 그대로
+  })
+
+  it('sessionsInFolder: from/to 기간 필터링', () => {
+    upsertSessions(db, [
+      {
+        sessionId: 'e1',
+        provider: 'claude',
+        folder: 'dated2',
+        startedAt: null,
+        endedAt: '2026-06-01T00:00:00Z',
+        totalTokens: 1,
+        costUsd: 1
+      },
+      {
+        sessionId: 'e2',
+        provider: 'claude',
+        folder: 'dated2',
+        startedAt: null,
+        endedAt: '2026-07-01T00:00:00Z', // to 경계값과 정확히 같은 날 — 포함돼야 함
+        totalTokens: 1,
+        costUsd: 1
+      }
+    ])
+
+    const rows = sessionsInFolder(db, 'dated2', { from: '2026-07-01', to: '2026-07-31' })
+    expect(rows.map((r) => r.sessionId)).toEqual(['e2'])
+  })
+
   it('monthlyRollup: date를 substr(date,1,7)로 월별 그룹핑', () => {
     const rows = monthlyRollup(db)
     const july = rows.filter((r) => r.month === '2026-07')

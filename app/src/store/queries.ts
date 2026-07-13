@@ -68,12 +68,44 @@ export function todayByProvider(
   return result
 }
 
+// 대시보드(Task 11)에서 추가한 opts — 원래 queries.ts(Task 6/9)엔 providers만 있었다. 폴더·세션 탭의
+// 기간 칩(목업 "이번 주/30일/전체")이 folderRollup/sessionsInFolder에도 적용되려면 날짜 필터가 필요해
+// dailyTotals와 동일한 from/to 패턴으로 확장했다(기존 호출부는 opts 생략 시 동작 그대로).
+// 주의: 세션 하나의 비용 전체를 "종료일(ended_at)"에 귀속시킨다 — dailyTotals/daily_usage.date(실제
+// 사용이 발생한 날짜별로 분산 기록)와는 귀속 기준이 달라, 같은 기간을 선택해도 두 탭의 합계가
+// 1원 단위로 정확히 일치하지는 않는다(폴더·세션 탭은 세션 단위 특성상 의도된 차이).
+interface FolderQueryOpts {
+  providers?: ProviderId[]
+  from?: string // YYYY-MM-DD, date(ended_at) >= from (포함)
+  to?: string // YYYY-MM-DD, date(ended_at) <= to (포함) — date()로 시각 성분을 제거해 경계일을 포함시킨다
+}
+
+function dateRangeFilter(opts: Pick<FolderQueryOpts, 'from' | 'to'>): {
+  clauses: string[]
+  params: string[]
+} {
+  const clauses: string[] = []
+  const params: string[] = []
+  if (opts.from) {
+    clauses.push('date(ended_at) >= ?')
+    params.push(opts.from)
+  }
+  if (opts.to) {
+    clauses.push('date(ended_at) <= ?')
+    params.push(opts.to)
+  }
+  return { clauses, params }
+}
+
 export function folderRollup(
   db: Database.Database,
-  opts: { providers?: ProviderId[] } = {}
+  opts: FolderQueryOpts = {}
 ): Array<{ folder: string; providers: ProviderId[]; costUsd: number; totalTokens: number }> {
   const providers = providerFilter(opts.providers)
-  const where = providers.clause ? `WHERE ${providers.clause}` : ''
+  const dateRange = dateRangeFilter(opts)
+  const conditions = [...(providers.clause ? [providers.clause] : []), ...dateRange.clauses]
+  const params = [...providers.params, ...dateRange.params]
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
 
   const rows = db
     .prepare(
@@ -83,7 +115,7 @@ export function folderRollup(
        GROUP BY folder, provider
        ORDER BY folder`
     )
-    .all(...providers.params) as Array<{
+    .all(...params) as Array<{
     folder: string
     provider: ProviderId
     costUsd: number
@@ -115,7 +147,7 @@ export function folderRollup(
 export function sessionsInFolder(
   db: Database.Database,
   folder: string,
-  opts: { providers?: ProviderId[] } = {}
+  opts: FolderQueryOpts = {}
 ): SessionRow[] {
   const conditions = ['folder = ?']
   const params: (string | ProviderId)[] = [folder]
@@ -124,6 +156,9 @@ export function sessionsInFolder(
     conditions.push(providers.clause)
     params.push(...providers.params)
   }
+  const dateRange = dateRangeFilter(opts)
+  conditions.push(...dateRange.clauses)
+  params.push(...dateRange.params)
 
   return db
     .prepare(

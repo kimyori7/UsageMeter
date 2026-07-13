@@ -6,6 +6,8 @@ import { useState } from 'react'
 import PeriodChips from '../components/PeriodChips'
 import ProviderToggle from '../components/ProviderToggle'
 import OverviewTab from './OverviewTab'
+import DailyTab from './DailyTab'
+import FoldersTab from './FoldersTab'
 import type { Period } from './period'
 import type { ProviderId } from '../../../providers/types'
 
@@ -62,8 +64,10 @@ export default function Dashboard(): React.JSX.Element {
         ) : (
           <>
             {activeTab === 'overview' && <OverviewTab period={period} providers={providers} />}
-            {/* 일별 기록/폴더·세션/월 리포트/설정은 후속 커밋에서 채운다(다음 3개 커밋 참고). */}
-            {activeTab !== 'overview' && (
+            {activeTab === 'daily' && <DailyTab period={period} providers={providers} />}
+            {activeTab === 'folders' && <FoldersTab period={period} providers={providers} />}
+            {/* 월 리포트/설정은 후속 커밋에서 채운다(다음 2개 커밋 참고). */}
+            {(activeTab === 'monthly' || activeTab === 'settings') && (
               <div className="dashboard-empty">이 탭은 다음 커밋에서 구현됩니다.</div>
             )}
           </>
