@@ -1,0 +1,84 @@
+{
+  "sessions": [
+    {
+      "cacheCreationTokens": 0,
+      "cacheReadTokens": 50000,
+      "costUSD": 2.0,
+      "directory": "2026/07/13",
+      "inputTokens": 1000,
+      "lastActivity": "2026-07-13T00:00:00.000Z",
+      "models": {
+        "gpt-5.6-sol": {
+          "cacheCreationTokens": 0,
+          "cacheReadTokens": 50000,
+          "inputTokens": 1000,
+          "isFallback": false,
+          "outputTokens": 2000,
+          "reasoningOutputTokens": 500,
+          "totalTokens": 53000
+        }
+      },
+      "outputTokens": 2000,
+      "reasoningOutputTokens": 500,
+      "sessionFile": "rollout-2026-07-13T00-00-00-00000000-0000-4000-8000-000000000011",
+      "sessionId": "2026/07/13/rollout-2026-07-13T00-00-00-00000000-0000-4000-8000-000000000011",
+      "totalTokens": 53000
+    },
+    {
+      "cacheCreationTokens": 0,
+      "cacheReadTokens": 100000,
+      "costUSD": 4.0,
+      "directory": "2026/07/13",
+      "inputTokens": 2000,
+      "lastActivity": "2026-07-13T00:00:00.000Z",
+      "models": {
+        "gpt-5.6-sol": {
+          "cacheCreationTokens": 0,
+          "cacheReadTokens": 100000,
+          "inputTokens": 2000,
+          "isFallback": false,
+          "outputTokens": 4000,
+          "reasoningOutputTokens": 1000,
+          "totalTokens": 106000
+        }
+      },
+      "outputTokens": 4000,
+      "reasoningOutputTokens": 1000,
+      "sessionFile": "rollout-2026-07-13T01-00-00-00000000-0000-4000-8000-000000000012",
+      "sessionId": "2026/07/13/rollout-2026-07-13T01-00-00-00000000-0000-4000-8000-000000000012",
+      "totalTokens": 106000
+    },
+    {
+      "cacheCreationTokens": 0,
+      "cacheReadTokens": 150000,
+      "costUSD": 6.0,
+      "directory": "2026/07/14",
+      "inputTokens": 3000,
+      "lastActivity": "2026-07-14T00:00:00.000Z",
+      "models": {
+        "gpt-5.6-sol": {
+          "cacheCreationTokens": 0,
+          "cacheReadTokens": 150000,
+          "inputTokens": 3000,
+          "isFallback": false,
+          "outputTokens": 6000,
+          "reasoningOutputTokens": 1500,
+          "totalTokens": 159000
+        }
+      },
+      "outputTokens": 6000,
+      "reasoningOutputTokens": 1500,
+      "sessionFile": "rollout-2026-07-14T00-00-00-00000000-0000-4000-8000-000000000013",
+      "sessionId": "2026/07/14/rollout-2026-07-14T00-00-00-00000000-0000-4000-8000-000000000013",
+      "totalTokens": 159000
+    }
+  ],
+  "totals": {
+    "cacheCreationTokens": 0,
+    "cacheReadTokens": 300000,
+    "inputTokens": 6000,
+    "outputTokens": 12000,
+    "totalTokens": 318000,
+    "costUSD": 12.0
+  }
+}
