@@ -1,5 +1,5 @@
-appId: com.electron.app
-productName: app
+appId: cc.kimyori.usagemeter
+productName: UsageMeter
 directories:
   buildResources: build
 files:
@@ -9,35 +9,21 @@ files:
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+extraResources:
+  - from: resources/icon.ico
+    to: icon.ico
 asarUnpack:
   - resources/**
+  - node_modules/ccusage/**
+  - node_modules/@ccusage/**
 win:
-  executableName: app
+  executableName: UsageMeter
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
+  artifactName: ${productName}-Setup-${version}.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
-mac:
-  entitlementsInherit: build/entitlements.mac.plist
-  extendInfo:
-    - NSCameraUsageDescription: Application requests access to the device's camera.
-    - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
-    - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
-    - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
-  notarize: false
-dmg:
-  artifactName: ${name}-${version}.${ext}
-linux:
-  target:
-    - AppImage
-    - snap
-    - deb
-  maintainer: electronjs.org
-  category: Utility
-appImage:
-  artifactName: ${name}-${version}.${ext}
+  oneClick: true
+  deleteAppDataOnUninstall: false
+# mac/linux 타겟, 자동 업데이트(publish)는 스펙 범위 밖(Windows 11 전용, autoUpdater 미사용) — 템플릿 기본값 제거.
 npmRebuild: false
-publish:
-  provider: generic
-  url: https://example.com/auto-updates
