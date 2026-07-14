@@ -5,6 +5,8 @@
 import { EventEmitter } from 'node:events'
 import type Database from 'better-sqlite3'
 import type { DailyRow, ProviderId, RateStatus, SessionRow } from '../providers/types'
+import type { AccountRateState, ActiveResults } from './accounts-cycle'
+import type { CodexAccountIdentity, CodexUsageResult } from '../providers/codex/usage-api'
 
 const LIMITS_MS_DEFAULT = 60_000
 const USAGE_MS_DEFAULT = 5 * 60_000
@@ -14,12 +16,15 @@ export interface AppState {
   limits: Record<ProviderId, RateStatus | null>
   today: Record<ProviderId, { costUsd: number; totalTokens: number }>
   lastUsageSyncAt: number | null
+  accounts: AccountRateState[]
 }
 
 export interface PollerDeps {
   db: Database.Database
   fetchClaudeLimits: () => Promise<RateStatus>
   readCodexLimits: () => Promise<RateStatus>
+  fetchCodexUsage: () => Promise<CodexUsageResult>
+  accountsCycle?: (active: ActiveResults) => Promise<AccountRateState[]>
   runCcusage: (args: string[]) => Promise<unknown>
   normalizeDaily: (provider: ProviderId, cliJson: unknown) => DailyRow[]
   normalizeSessions: (
@@ -68,7 +73,8 @@ export class Poller extends EventEmitter {
     this.state = {
       limits: { claude: null, codex: null },
       today: { claude: { costUsd: 0, totalTokens: 0 }, codex: { costUsd: 0, totalTokens: 0 } },
-      lastUsageSyncAt: null
+      lastUsageSyncAt: null,
+      accounts: []
     }
   }
 
@@ -96,7 +102,8 @@ export class Poller extends EventEmitter {
     return {
       lastUsageSyncAt: this.state.lastUsageSyncAt,
       limits: { ...this.state.limits },
-      today: { ...this.state.today }
+      today: { ...this.state.today },
+      accounts: [...this.state.accounts]
     }
   }
 
@@ -123,41 +130,75 @@ export class Poller extends EventEmitter {
       : null
   }
 
-  private async fetchProviderLimits(provider: ProviderId): Promise<RateStatus> {
-    return provider === 'claude' ? this.deps.fetchClaudeLimits() : this.deps.readCodexLimits()
-  }
-
   private async tickLimits(): Promise<void> {
     if (this.limitsRunning) return
     this.limitsRunning = true
     let failed = false
-    for (const provider of ['claude', 'codex'] as const) {
-      try {
-        const status = await this.fetchProviderLimits(provider)
-        // 계약상 fetchClaudeLimits/readCodexLimits는 throw하지 않고 실패를 status.error로 알린다.
-        // status.stale은 "데이터는 유효하지만 오래됨"(codex mtime)일 수 있어 실패 신호가 아니다.
-        if (status.error) {
-          failed = true
-          this.state.limits[provider] = this.staleFallback(provider, status)
-        } else {
-          this.state.limits[provider] = status
+    let codexAccount: CodexAccountIdentity | null = null
+
+    // 계약상 fetchClaudeLimits/readCodexLimits/fetchCodexUsage는 throw하지 않고 실패를 status.error로
+    // 알린다. status.stale은 "데이터는 유효하지만 오래됨"(codex mtime)일 수 있어 실패 신호가 아니다.
+    const apply = (provider: ProviderId, status: RateStatus): void => {
+      if (status.error) {
+        failed = true
+        this.state.limits[provider] = this.staleFallback(provider, status)
+      } else {
+        this.state.limits[provider] = status
+        if (!this.deps.accountsCycle) {
+          // 레거시 모드(accountsCycle 미제공, 예: 마이그레이션 실패)에서만 직접 기록 — 사이클 모드에선
+          // 사이클이 계정 태그로 기록한다(이중 기록 금지).
           try {
             this.deps.recordSnapshots(this.deps.db, status)
           } catch {
             // 스냅샷 기록(DB) 실패는 fetch 성공 판정과 무관 — 상태는 정상 유지, 다음 틱에 재시도.
           }
         }
-      } catch {
-        // 방어적 처리 — 실제 구현은 throw하지 않지만 예상 밖의 예외에도 동일하게 대응한다.
-        failed = true
-        this.state.limits[provider] = this.staleFallback(provider, {
-          provider,
-          windows: [],
-          fetchedAt: Date.now(),
-          error: 'network'
-        })
       }
     }
+
+    try {
+      apply('claude', await this.deps.fetchClaudeLimits())
+    } catch {
+      // 방어적 처리 — 실제 구현은 throw하지 않지만 예상 밖의 예외에도 동일하게 대응한다.
+      failed = true
+      this.state.limits.claude = this.staleFallback('claude', {
+        provider: 'claude',
+        windows: [],
+        fetchedAt: Date.now(),
+        error: 'network'
+      })
+    }
+
+    try {
+      const wham = await this.deps.fetchCodexUsage()
+      codexAccount = wham.account
+      let codexStatus = wham.status
+      if (codexStatus.error) {
+        const rollout = await this.deps.readCodexLimits()
+        if (!rollout.error) codexStatus = rollout // wham 실패 시 rollout 폴백(스펙 §데이터 흐름 2)
+      }
+      apply('codex', codexStatus)
+    } catch {
+      failed = true
+      this.state.limits.codex = this.staleFallback('codex', {
+        provider: 'codex',
+        windows: [],
+        fetchedAt: Date.now(),
+        error: 'network'
+      })
+    }
+
+    if (this.deps.accountsCycle) {
+      try {
+        this.state.accounts = await this.deps.accountsCycle({
+          claude: this.state.limits.claude,
+          codex: { status: this.state.limits.codex, account: codexAccount }
+        })
+      } catch {
+        // 사이클 실패는 limits 표시를 깨지 않는다 — 이전 accounts 유지, 다음 틱 재시도.
+      }
+    }
+
     this.limitsFailures = failed ? this.limitsFailures + 1 : 0
     this.limitsRunning = false
     this.emitState()

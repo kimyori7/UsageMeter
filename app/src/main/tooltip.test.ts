@@ -31,6 +31,7 @@ function baseState(overrides: Partial<AppState> = {}): AppState {
     limits: { claude: null, codex: null },
     today: { claude: { costUsd: 0, totalTokens: 0 }, codex: { costUsd: 0, totalTokens: 0 } },
     lastUsageSyncAt: NOW,
+    accounts: [],
     ...overrides
   }
 }

@@ -21,11 +21,17 @@ function codexStatus(overrides: Partial<RateStatus> = {}): RateStatus {
   }
 }
 
-function makeDeps(): PollerDeps {
+function makeDeps(overrides: Partial<PollerDeps> = {}): PollerDeps {
   return {
     db: openDb(':memory:'),
     fetchClaudeLimits: vi.fn().mockResolvedValue(claudeStatus()),
     readCodexLimits: vi.fn().mockResolvedValue(codexStatus()),
+    // 기본값: wham은 network 에러로 스텁 — 기존 케이스들이 rollout(readCodexLimits) 경로로 흘러
+    // 기존 기대값을 그대로 보존한다. 신규 wham 관련 케이스는 overrides로 이 스텁을 덮어쓴다.
+    fetchCodexUsage: vi.fn().mockResolvedValue({
+      account: null,
+      status: { provider: 'codex', windows: [], fetchedAt: Date.now(), error: 'network' as const }
+    }),
     runCcusage: vi.fn().mockResolvedValue({ daily: [], sessions: [] }),
     normalizeDaily: vi.fn().mockReturnValue([]),
     normalizeSessions: vi.fn().mockReturnValue([]),
@@ -35,7 +41,9 @@ function makeDeps(): PollerDeps {
     todayByProvider: vi.fn().mockReturnValue({
       claude: { costUsd: 0, totalTokens: 0 },
       codex: { costUsd: 0, totalTokens: 0 }
-    })
+    }),
+    // accountsCycle는 기본 미지정(undefined) — 기존 케이스는 레거시 recordSnapshots 경로 그대로 검증된다.
+    ...overrides
   }
 }
 
@@ -315,5 +323,71 @@ describe('Poller', () => {
     poller.stop()
     await vi.advanceTimersByTimeAsync(10 * 60_000)
     expect(deps.fetchClaudeLimits).toHaveBeenCalledTimes(callsAfterStart)
+  })
+
+  describe('멀티 계정 통합', () => {
+    it('wham 성공 시 rollout을 호출하지 않고 wham 상태를 쓴다', async () => {
+      const readCodexLimits = vi.fn()
+      const deps = makeDeps({
+        fetchCodexUsage: async () => ({
+          account: { id: 'cx', email: 'c@c.com' },
+          status: codexStatus()
+        }),
+        readCodexLimits
+      })
+      const poller = new Poller(deps)
+      await poller.refreshNow()
+      expect(readCodexLimits).not.toHaveBeenCalled()
+      expect(poller.getState().limits.codex).toEqual(codexStatus())
+    })
+
+    it('wham 에러·rollout 정상 → rollout 채택(폴백)', async () => {
+      const deps = makeDeps({
+        fetchCodexUsage: async () => ({
+          account: null,
+          status: {
+            provider: 'codex' as const,
+            windows: [],
+            fetchedAt: 1,
+            error: 'network' as const
+          }
+        }),
+        readCodexLimits: async () => codexStatus({ stale: true })
+      })
+      const poller = new Poller(deps)
+      await poller.refreshNow()
+      expect(poller.getState().limits.codex).toEqual(codexStatus({ stale: true }))
+    })
+
+    it('accountsCycle 결과가 state.accounts에 실리고, cycle throw는 limits를 깨지 않는다', async () => {
+      const entry = {
+        account: { provider: 'claude' as const, id: 'a', email: 'a@a.com' },
+        status: claudeStatus(),
+        live: true,
+        lastSeenAt: 1
+      }
+      const deps = makeDeps({ accountsCycle: async () => [entry] })
+      const poller = new Poller(deps)
+      await poller.refreshNow()
+      expect(poller.getState().accounts).toEqual([entry])
+
+      const deps2 = makeDeps({
+        accountsCycle: async () => {
+          throw new Error('boom')
+        }
+      })
+      const poller2 = new Poller(deps2)
+      await poller2.refreshNow()
+      expect(poller2.getState().limits.claude).toEqual(claudeStatus()) // limits 정상
+      expect(poller2.getState().accounts).toEqual([]) // 이전값(초기 []) 유지
+    })
+
+    it('accountsCycle 있으면 poller의 직접 recordSnapshots를 건너뛴다(이중 기록 금지)', async () => {
+      const recordSnapshots = vi.fn()
+      const deps = makeDeps({ recordSnapshots, accountsCycle: async () => [] })
+      const poller = new Poller(deps)
+      await poller.refreshNow()
+      expect(recordSnapshots).not.toHaveBeenCalled()
+    })
   })
 })
