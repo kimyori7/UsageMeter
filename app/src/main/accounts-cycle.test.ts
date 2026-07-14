@@ -169,3 +169,25 @@ describe('runAccountsCycle — 비활성 계정', () => {
     expect(fetchUsage).not.toHaveBeenCalled()
   })
 })
+
+describe('runAccountsCycle — 프로바이더별 예외 격리', () => {
+  it('Claude 블록에서 동기 예외가 나도 사이클은 reject하지 않고 Codex는 계속 처리된다', async () => {
+    upsertAccount(db, { provider: 'codex', id: 'cx-old', email: 'old@c.com' }, 1000)
+    vault.copyIfChanged('codex', 'cx-old', join(srcDir, 'auth.json'))
+    const deps = makeDeps({
+      readAccount: () => {
+        throw new Error('DB failure')
+      }
+    })
+    const states = await runAccountsCycle(deps, activeBoth)
+    // Claude 블록은 통째로 실패했으므로 claude 상태는 하나도 없어야 한다.
+    expect(states.filter((s) => s.account.provider === 'claude')).toHaveLength(0)
+    // Codex 블록은 Claude 실패와 무관하게 활성/비활성 계정 모두 정상 처리되어야 한다.
+    expect(states.some((s) => s.account.provider === 'codex' && s.account.id === 'cx-active')).toBe(
+      true
+    )
+    expect(states.some((s) => s.account.provider === 'codex' && s.account.id === 'cx-old')).toBe(
+      true
+    )
+  })
+})

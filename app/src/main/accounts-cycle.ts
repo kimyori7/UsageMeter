@@ -110,77 +110,87 @@ export async function runAccountsCycle(
   }
 
   // ---- Claude ----
-  const claudeActiveId = registerActive(
-    'claude',
-    deps.claude.readAccount(),
-    active.claude,
-    deps.claude.credPath
-  )
-  for (const rec of listAccounts(db, 'claude')) {
-    if (rec.id === claudeActiveId) continue
-    try {
-      if (vault.isRevoked('claude', rec.id) || !vault.hasCopy('claude', rec.id)) {
-        states.push(snapshotState('claude', rec))
-        continue
+  // registerActive 호출(인자 평가 포함)과 비활성 루프 헤더의 raw DB 호출은 동기적으로 throw할 수 있다
+  // (SQLITE_BUSY/FULL/corruption 등). 이 블록 전체를 감싸서 Claude 실패가 Codex 처리를 막지 않게 한다.
+  try {
+    const claudeActiveId = registerActive(
+      'claude',
+      deps.claude.readAccount(),
+      active.claude,
+      deps.claude.credPath
+    )
+    for (const rec of listAccounts(db, 'claude')) {
+      if (rec.id === claudeActiveId) continue
+      try {
+        if (vault.isRevoked('claude', rec.id) || !vault.hasCopy('claude', rec.id)) {
+          states.push(snapshotState('claude', rec))
+          continue
+        }
+        const token = await deps.claude.ensureToken(vault.credPath('claude', rec.id))
+        const status = await deps.claude.fetchLimits(token)
+        if (status.error === 'unauthorized' || status.error === 'no-credentials') {
+          vault.markRevoked('claude', rec.id)
+          states.push(snapshotState('claude', rec))
+        } else if (status.error) {
+          states.push(snapshotState('claude', rec)) // 일시 오류(network 등) — revoked 아님
+        } else {
+          safeRecord(status, rec.id)
+          states.push({
+            account: { provider: 'claude', id: rec.id, email: rec.email, plan: rec.plan },
+            status,
+            live: true,
+            lastSeenAt: status.fetchedAt
+          })
+        }
+      } catch {
+        states.push(snapshotState('claude', rec)) // 한 계정의 실패가 사이클을 죽이지 않는다
       }
-      const token = await deps.claude.ensureToken(vault.credPath('claude', rec.id))
-      const status = await deps.claude.fetchLimits(token)
-      if (status.error === 'unauthorized' || status.error === 'no-credentials') {
-        vault.markRevoked('claude', rec.id)
-        states.push(snapshotState('claude', rec))
-      } else if (status.error) {
-        states.push(snapshotState('claude', rec)) // 일시 오류(network 등) — revoked 아님
-      } else {
-        safeRecord(status, rec.id)
-        states.push({
-          account: { provider: 'claude', id: rec.id, email: rec.email, plan: rec.plan },
-          status,
-          live: true,
-          lastSeenAt: status.fetchedAt
-        })
-      }
-    } catch {
-      states.push(snapshotState('claude', rec)) // 한 계정의 실패가 사이클을 죽이지 않는다
     }
+  } catch {
+    // Claude 블록 자체(등록/목록 조회)의 실패 — 이미 push된 상태는 유지하고 Codex 블록으로 넘어간다.
   }
 
   // ---- Codex ----
-  const codexActiveId = registerActive(
-    'codex',
-    active.codex.account,
-    active.codex.status,
-    deps.codex.authPath
-  )
-  for (const rec of listAccounts(db, 'codex')) {
-    if (rec.id === codexActiveId) continue
-    try {
-      if (vault.isRevoked('codex', rec.id) || !vault.hasCopy('codex', rec.id)) {
+  try {
+    const codexActiveId = registerActive(
+      'codex',
+      active.codex.account,
+      active.codex.status,
+      deps.codex.authPath
+    )
+    for (const rec of listAccounts(db, 'codex')) {
+      if (rec.id === codexActiveId) continue
+      try {
+        if (vault.isRevoked('codex', rec.id) || !vault.hasCopy('codex', rec.id)) {
+          states.push(snapshotState('codex', rec))
+          continue
+        }
+        const auth = deps.codex.readVaultAuth(vault.credPath('codex', rec.id))
+        if (!auth) {
+          states.push(snapshotState('codex', rec))
+          continue
+        }
+        const { status } = await deps.codex.fetchUsage(auth)
+        if (status.error === 'unauthorized' || status.error === 'no-credentials') {
+          vault.markRevoked('codex', rec.id)
+          states.push(snapshotState('codex', rec))
+        } else if (status.error) {
+          states.push(snapshotState('codex', rec))
+        } else {
+          safeRecord(status, rec.id)
+          states.push({
+            account: { provider: 'codex', id: rec.id, email: rec.email, plan: rec.plan },
+            status,
+            live: true,
+            lastSeenAt: status.fetchedAt
+          })
+        }
+      } catch {
         states.push(snapshotState('codex', rec))
-        continue
       }
-      const auth = deps.codex.readVaultAuth(vault.credPath('codex', rec.id))
-      if (!auth) {
-        states.push(snapshotState('codex', rec))
-        continue
-      }
-      const { status } = await deps.codex.fetchUsage(auth)
-      if (status.error === 'unauthorized' || status.error === 'no-credentials') {
-        vault.markRevoked('codex', rec.id)
-        states.push(snapshotState('codex', rec))
-      } else if (status.error) {
-        states.push(snapshotState('codex', rec))
-      } else {
-        safeRecord(status, rec.id)
-        states.push({
-          account: { provider: 'codex', id: rec.id, email: rec.email, plan: rec.plan },
-          status,
-          live: true,
-          lastSeenAt: status.fetchedAt
-        })
-      }
-    } catch {
-      states.push(snapshotState('codex', rec))
     }
+  } catch {
+    // Codex 블록 자체의 실패 — Claude 블록에서 이미 push된 상태는 그대로 반환된다.
   }
 
   return states
