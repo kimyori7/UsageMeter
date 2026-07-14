@@ -226,7 +226,7 @@ body {
 .account-card {
   border-radius: 8px;
   padding: 8px 10px;
-  background: var(--card-bg, rgba(255, 255, 255, 0.04));
+  background: var(--color-card-bg);
 }
 
 .account-card--snapshot {
@@ -241,6 +241,8 @@ body {
 }
 
 .account-email {
+  flex: 1;
+  min-width: 0;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
