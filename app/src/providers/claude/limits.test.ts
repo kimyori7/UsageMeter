@@ -1,5 +1,11 @@
 import { describe, it, expect, vi } from 'vitest'
+
+// deps.token을 안 넘긴(undefined) 기본 경로만 ensureFreshToken을 거친다는 계약을 검증하기 위한 mock.
+// 토큰 값은 명백한 가짜 문자열만 사용한다.
+vi.mock('./refresh', () => ({ ensureFreshToken: vi.fn() }))
+
 import { fetchClaudeLimits } from './limits'
+import { ensureFreshToken } from './refresh'
 
 const okBody = {
   five_hour: { utilization: 68, resets_at: '2026-07-13T09:00:00Z' },
@@ -50,5 +56,24 @@ describe('fetchClaudeLimits', () => {
       }) as unknown as typeof fetch
     })
     expect(s.error).toBe('network')
+  })
+
+  it('deps.token을 안 넘기면(undefined) ensureFreshToken()의 결과를 토큰으로 사용한다', async () => {
+    vi.mocked(ensureFreshToken).mockResolvedValueOnce('FAKE-FRESH-TOKEN')
+    const fetchFn = mkFetch(200, okBody)
+    const s = await fetchClaudeLimits({ fetchFn })
+    expect(ensureFreshToken).toHaveBeenCalledTimes(1)
+    expect(s.error).toBeUndefined()
+    const [, init] = (fetchFn as unknown as ReturnType<typeof vi.fn>).mock.calls[0] as [
+      string,
+      { headers: Record<string, string> }
+    ]
+    expect(init.headers.Authorization).toBe('Bearer FAKE-FRESH-TOKEN')
+  })
+
+  it('deps.token을 안 넘겼고 ensureFreshToken()이 null이면 no-credentials', async () => {
+    vi.mocked(ensureFreshToken).mockResolvedValueOnce(null)
+    const s = await fetchClaudeLimits({ fetchFn: mkFetch(200, okBody) })
+    expect(s.error).toBe('no-credentials')
   })
 })

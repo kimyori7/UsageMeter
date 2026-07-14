@@ -1,5 +1,5 @@
 import type { RateStatus, RateWindow } from '../types'
-import { readAccessToken } from './credentials'
+import { ensureFreshToken } from './refresh'
 
 const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage'
 
@@ -18,7 +18,7 @@ function win(kind: RateWindow['kind'], raw: unknown): RateWindow | null {
 export async function fetchClaudeLimits(
   deps: { token?: string | null; fetchFn?: typeof fetch } = {}
 ): Promise<RateStatus> {
-  const token = deps.token !== undefined ? deps.token : readAccessToken()
+  const token = deps.token !== undefined ? deps.token : await ensureFreshToken()
   const fetchFn = deps.fetchFn ?? fetch
   const base: RateStatus = { provider: 'claude', windows: [], fetchedAt: Date.now() }
   if (!token) return { ...base, error: 'no-credentials' }
