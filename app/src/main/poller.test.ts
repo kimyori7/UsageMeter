@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { openDb } from '../store/db'
-import { Poller, nextDelay, nextLimitsDelay, type PollerDeps } from './poller'
+import { Poller, nextLimitsDelay, type PollerDeps } from './poller'
 import type { RateStatus } from '../providers/types'
 
 function claudeStatus(overrides: Partial<RateStatus> = {}): RateStatus {
@@ -173,21 +173,6 @@ describe('Poller', () => {
     expect(deps.fetchClaudeLimits).toHaveBeenCalledTimes(4)
 
     poller.stop()
-  })
-
-  describe('nextDelay (pure backoff formula, still used by usage ticks)', () => {
-    it('returns the base interval with no failures', () => {
-      expect(nextDelay(60_000, 0)).toBe(60_000)
-    })
-    it('doubles per consecutive failure', () => {
-      expect(nextDelay(60_000, 1)).toBe(120_000)
-      expect(nextDelay(60_000, 2)).toBe(240_000)
-      expect(nextDelay(60_000, 3)).toBe(480_000)
-    })
-    it('caps at 15 minutes', () => {
-      expect(nextDelay(60_000, 4)).toBe(15 * 60_000) // uncapped would be 960_000
-      expect(nextDelay(60_000, 10)).toBe(15 * 60_000)
-    })
   })
 
   describe('nextLimitsDelay (pure limits scheduling formula)', () => {
