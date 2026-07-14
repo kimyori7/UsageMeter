@@ -5,7 +5,7 @@
 // 유지 정책, staleFallback) 게이지를 계속 그린다 — 빈 화면 금지(스펙 §7). "오늘 사용"은 ccusage 기반 별도
 // 파이프라인(AppState.today)이라 limits 에러와 무관하게 항상 표시한다. stale은 에러가 아니라 옅은 캡션만.
 import GaugeBar from './GaugeBar'
-import { fmtMoney, fmtTokens } from './format'
+import { fmtClock, fmtMoney, fmtTokens } from './format'
 import type { ProviderId, RateStatus } from '../../../providers/types'
 
 const PROVIDER_LABEL: Record<ProviderId, string> = { claude: 'Claude', codex: 'Codex' }
@@ -15,12 +15,6 @@ interface ProviderCardProps {
   status: RateStatus | null // 최초 폴링 틱 전(AppState.limits[p])에는 null일 수 있다
   today: { costUsd: number; totalTokens: number }
   now: number // epoch ms — 호출자(Popup)가 useNow()로 공급한다(렌더 중 Date.now() 직접 호출 금지)
-}
-
-/** 'HH:MM' 24시간제, 2자리 패딩 — "마지막 갱신" 캡션용. */
-function fmtClock(ms: number): string {
-  const d = new Date(ms)
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
 /** fetchedAt(마지막 성공 시점)로부터 경과 분 — stale 캡션 "{n}분 전 활동 기준"용. */

@@ -38,6 +38,12 @@ export function fmtTokens(n: number): string {
   return `${n} tok`
 }
 
+/** 'HH:MM' 24시간제, 2자리 패딩 — "마지막 갱신"·"기준 시각" 캡션용. */
+export function fmtClock(ms: number): string {
+  const d = new Date(ms)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
 const WARN_PERCENT = 90
 
 /** 게이지 라벨에 표시하는 정수 % — 표시와 경고 판정이 반드시 같은 반올림 값을 쓰도록 하는 단일 진입점. */

@@ -202,6 +202,67 @@ body {
   opacity: 0.5;
 }
 
+/* ── 멀티 계정: provider 그룹 + 계정 카드 ──────────────────────────────── */
+
+.account-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.account-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px 0;
+}
+
+.account-group-today {
+  margin-left: auto;
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.account-card {
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--card-bg, rgba(255, 255, 255, 0.04));
+}
+
+.account-card--snapshot {
+  opacity: 0.62;
+}
+
+.account-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.account-email {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-badge {
+  margin-left: auto;
+  font-size: 10px;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+.account-badge--live {
+  color: #4caf50;
+  opacity: 1;
+}
+
+.gauge-row--reset .gauge-label b {
+  color: #4caf50;
+}
+
 /* ── 대시보드 (Task 11) ─────────────────────────────────────────────── */
 /* html,body의 overflow:hidden(팝업용)은 그대로 두고, 대시보드는 내부(.dashboard-body)만 스크롤한다. */
 
