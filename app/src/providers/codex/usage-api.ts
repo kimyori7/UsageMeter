@@ -73,6 +73,8 @@ export async function fetchCodexUsage(
   } catch {
     return { account: null, status: { ...base, error: 'network' } }
   }
+  if (body === null || typeof body !== 'object')
+    return { account: null, status: { ...base, error: 'no-data' } }
 
   const account: CodexAccountIdentity = {
     id: typeof body.account_id === 'string' ? body.account_id : auth.accountId,

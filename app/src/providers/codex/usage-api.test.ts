@@ -110,4 +110,10 @@ describe('fetchCodexUsage', () => {
     expect(r.status.error).toBe('no-credentials')
     expect(fetchFn).not.toHaveBeenCalled()
   })
+
+  it('2xx인데 body가 null(JSON.parse("null")) → no-data (throw 대신)', async () => {
+    const r = await fetchCodexUsage({ auth: AUTH, fetchFn: async () => jsonRes(200, null) })
+    expect(r.status.error).toBe('no-data')
+    expect(r.account).toBeNull()
+  })
 })
