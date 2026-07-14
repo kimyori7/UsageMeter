@@ -28,7 +28,11 @@ describe('settings', () => {
   })
 
   it('파일이 없으면 기본값을 반환', () => {
-    expect(loadSettings()).toEqual({ autoStart: false, limitsIntervalSec: 60, usageIntervalMin: 5 })
+    expect(loadSettings()).toEqual({
+      autoStart: false,
+      limitsIntervalSec: 300,
+      usageIntervalMin: 5
+    })
   })
 
   it('저장 후 로드하면 저장한 값 그대로(라운드트립)', () => {
@@ -52,7 +56,11 @@ describe('settings', () => {
 
   it('손상된 JSON 파일이면 기본값으로 폴백', () => {
     writeFileSync(join(dir, 'settings.json'), '{not json')
-    expect(loadSettings()).toEqual({ autoStart: false, limitsIntervalSec: 60, usageIntervalMin: 5 })
+    expect(loadSettings()).toEqual({
+      autoStart: false,
+      limitsIntervalSec: 300,
+      usageIntervalMin: 5
+    })
   })
 
   it('필드 타입이 어긋난 값은 기본값으로 대체(부분 손상 방어)', () => {
@@ -60,7 +68,11 @@ describe('settings', () => {
       join(dir, 'settings.json'),
       JSON.stringify({ autoStart: 'yes', usageIntervalMin: 7 })
     )
-    expect(loadSettings()).toEqual({ autoStart: false, limitsIntervalSec: 60, usageIntervalMin: 7 })
+    expect(loadSettings()).toEqual({
+      autoStart: false,
+      limitsIntervalSec: 300,
+      usageIntervalMin: 7
+    })
   })
 
   it('너무 작은 간격 값은 최소치로 clamp되어 저장/로드됨 (폴러 폭주 방지)', () => {
@@ -78,11 +90,15 @@ describe('settings', () => {
     } as unknown as Parameters<typeof saveSettings>[0])
 
     const persisted = JSON.parse(readFileSync(join(dir, 'settings.json'), 'utf-8'))
-    expect(persisted).toEqual({ autoStart: false, limitsIntervalSec: 60, usageIntervalMin: 5 })
+    expect(persisted).toEqual({ autoStart: false, limitsIntervalSec: 300, usageIntervalMin: 5 })
     expect(setLoginItemSettings).toHaveBeenLastCalledWith({
       openAtLogin: false,
       args: ['--start-minimized']
     })
-    expect(loadSettings()).toEqual({ autoStart: false, limitsIntervalSec: 60, usageIntervalMin: 5 })
+    expect(loadSettings()).toEqual({
+      autoStart: false,
+      limitsIntervalSec: 300,
+      usageIntervalMin: 5
+    })
   })
 })

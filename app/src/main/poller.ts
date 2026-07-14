@@ -1,6 +1,7 @@
-// 폴링 오케스트레이터: limits는 60s, usage(ccusage 4회 실행 + DB upsert)는 5min 주기로 수집한다.
-// limits 실패 시 직전 성공값을 stale=true로 유지하고 간격을 실패 횟수당 2배(최대 15분)로 늘리며,
-// 성공하면 리셋한다. usage 실패는 last-good 상태(DB에 남은 값)를 그대로 유지하고 조용히 재시도한다.
+// 폴링 오케스트레이터: limits·usage(ccusage 4회 실행 + DB upsert) 모두 기본 5min 주기로 수집한다.
+// limits 실패 시 직전 성공값을 stale=true로 유지하고 간격을 1분 고정 재시도(base가 그보다 짧으면 base
+// 유지)로 좁히며, 성공하면 base로 복귀한다. usage 실패는 last-good 상태(DB에 남은 값)를 그대로 유지하고
+// 조용히 재시도한다(usage 틱은 기존 지수 백오프 nextDelay를 그대로 쓴다).
 // 타이머는 자기 재예약(self-rescheduling) setTimeout 체인이라 동시에 여러 틱이 겹치지 않는다.
 import { EventEmitter } from 'node:events'
 import type Database from 'better-sqlite3'
@@ -8,9 +9,10 @@ import type { DailyRow, ProviderId, RateStatus, SessionRow } from '../providers/
 import type { AccountRateState, ActiveResults } from './accounts-cycle'
 import type { CodexAccountIdentity, CodexUsageResult } from '../providers/codex/usage-api'
 
-const LIMITS_MS_DEFAULT = 60_000
+const LIMITS_MS_DEFAULT = 5 * 60_000
 const USAGE_MS_DEFAULT = 5 * 60_000
 const BACKOFF_CAP_MS = 15 * 60_000
+export const LIMITS_RETRY_MS = 60_000
 
 export interface AppState {
   limits: Record<ProviderId, RateStatus | null>
@@ -44,6 +46,11 @@ export interface PollerDeps {
 
 export function nextDelay(baseMs: number, failures: number): number {
   return failures === 0 ? baseMs : Math.min(baseMs * 2 ** failures, BACKOFF_CAP_MS)
+}
+
+/** limits 틱 전용: 실패 중엔 짧게(1분) 재시도한다. base가 그보다 짧으면 base 유지(과폭주 방지). */
+export function nextLimitsDelay(baseMs: number, failures: number): number {
+  return failures === 0 ? baseMs : Math.min(LIMITS_RETRY_MS, baseMs)
 }
 
 function todayDateString(): string {
@@ -202,7 +209,7 @@ export class Poller extends EventEmitter {
     this.limitsFailures = failed ? this.limitsFailures + 1 : 0
     this.limitsRunning = false
     this.emitState()
-    this.scheduleLimits(nextDelay(this.limitsBaseMs, this.limitsFailures))
+    this.scheduleLimits(nextLimitsDelay(this.limitsBaseMs, this.limitsFailures))
   }
 
   /** 직전 성공값이 있으면 그 값을 stale=true로 유지, 없으면 새로 온 에러 상태를 그대로 쓴다. */

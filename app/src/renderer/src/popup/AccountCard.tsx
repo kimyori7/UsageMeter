@@ -1,7 +1,8 @@
 // 계정 카드 하나(스펙 §UI). ProviderCard와 달리 "오늘 사용"이 없다(비용은 provider 단위 —
-// 그룹 헤더가 담당). 스냅샷 카드는 account-card--snapshot으로 흐리게, 리셋 지난 창은 게이지 대신 문구.
+// 그룹 헤더가 담당). 스냅샷 카드는 마지막 성공 후 SNAPSHOT_GRACE_MS(10분)가 지나야 흐려진다(isDimmed) —
+// 그 전까지는 밝은 카드 + "HH:MM 기준" 스탬프. 리셋 지난 창은 게이지 대신 문구.
 import GaugeBar from './GaugeBar'
-import { displayWindow, type DisplayWindow } from './accountView'
+import { displayWindow, isDimmed, type DisplayWindow } from './accountView'
 import { fmtClock } from './format'
 import type { AccountRateState } from '../../../main/accounts-cycle'
 
@@ -12,6 +13,7 @@ interface AccountCardProps {
 
 export default function AccountCard({ entry, now }: AccountCardProps): React.JSX.Element {
   const { account, status, live, lastSeenAt } = entry
+  const dimmed = isDimmed(live, lastSeenAt, now)
   const nowSec = Math.floor(now / 1000)
   const session = displayWindow(
     status.windows.find((w) => w.kind === 'session_5h') ?? null,
@@ -38,7 +40,7 @@ export default function AccountCard({ entry, now }: AccountCardProps): React.JSX
     )
 
   return (
-    <div className={`account-card${live ? '' : ' account-card--snapshot'}`}>
+    <div className={`account-card${dimmed ? ' account-card--snapshot' : ''}`}>
       <div className="account-header">
         <span className="account-email" title={account.email || account.id}>
           {account.email || account.id}

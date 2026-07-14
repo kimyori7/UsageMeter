@@ -94,6 +94,19 @@ describe('runAccountsCycle — 활성 계정', () => {
     expect(period.account_id).toBe('cx-active')
   })
 
+  it('활성 계정 에러 상태 → live=false, lastSeenAt은 nowMs가 아니라 status.fetchedAt(직전 성공 시각)', async () => {
+    const errorStatus: RateStatus = {
+      provider: 'claude',
+      windows: [],
+      fetchedAt: 4242, // poller.staleFallback이 직전 성공 status를 그대로 넘기므로 nowMs(5000)과 달라야 의미가 있다
+      error: 'network'
+    }
+    const states = await runAccountsCycle(makeDeps(), { ...activeBoth, claude: errorStatus })
+    const claude = states.find((s) => s.account.id === 'cl-active')
+    expect(claude?.live).toBe(false)
+    expect(claude?.lastSeenAt).toBe(4242)
+  })
+
   it('활성 신원 미상이어도 상태가 성공이면 "" 태그로 스냅샷을 남긴다(이력 연속성)', async () => {
     const states = await runAccountsCycle(makeDeps({ readAccount: () => null }), {
       ...activeBoth,

@@ -12,7 +12,7 @@ export interface Settings {
   usageIntervalMin: number
 }
 
-const DEFAULT_SETTINGS: Settings = { autoStart: false, limitsIntervalSec: 60, usageIntervalMin: 5 }
+const DEFAULT_SETTINGS: Settings = { autoStart: false, limitsIntervalSec: 300, usageIntervalMin: 5 }
 
 // 값이 너무 작으면(0 등) poller의 자기재예약 타이머가 간격 없이 돌며 OAuth API/ccusage를 폭주시킨다 —
 // 손으로 수정한 JSON이나 UI 입력 실수로부터 항상 방어한다(로드·저장 양쪽에서 clamp).

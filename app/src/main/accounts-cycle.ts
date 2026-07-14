@@ -83,7 +83,7 @@ export async function runAccountsCycle(
         account: { provider, ...identity },
         status,
         live: !status.error,
-        lastSeenAt: status.error ? nowMs : status.fetchedAt
+        lastSeenAt: status.fetchedAt
       })
     }
     return identity.id

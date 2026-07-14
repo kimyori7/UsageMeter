@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { openDb } from '../store/db'
-import { Poller, nextDelay, type PollerDeps } from './poller'
+import { Poller, nextDelay, nextLimitsDelay, type PollerDeps } from './poller'
 import type { RateStatus } from '../providers/types'
 
 function claudeStatus(overrides: Partial<RateStatus> = {}): RateStatus {
@@ -65,7 +65,7 @@ describe('Poller', () => {
     poller.stop()
   })
 
-  it('re-polls limits after 60s', async () => {
+  it('re-polls limits after 5 minutes (new base interval)', async () => {
     vi.useFakeTimers()
     const deps = makeDeps()
     const poller = new Poller(deps)
@@ -73,7 +73,7 @@ describe('Poller', () => {
     await vi.advanceTimersByTimeAsync(0)
     expect(deps.fetchClaudeLimits).toHaveBeenCalledTimes(1)
 
-    await vi.advanceTimersByTimeAsync(60_000)
+    await vi.advanceTimersByTimeAsync(5 * 60_000)
     expect(deps.fetchClaudeLimits).toHaveBeenCalledTimes(2)
     poller.stop()
   })
@@ -86,7 +86,7 @@ describe('Poller', () => {
     await vi.advanceTimersByTimeAsync(0)
     expect(deps.runCcusage).toHaveBeenCalledTimes(4)
 
-    await vi.advanceTimersByTimeAsync(60_000) // one more limits tick, no usage yet
+    await vi.advanceTimersByTimeAsync(60_000) // still short of the 5min usage base (limits base is now 5min too, so no extra limits tick fires here either)
     expect(deps.runCcusage).toHaveBeenCalledTimes(4)
 
     await vi.advanceTimersByTimeAsync(240_000) // total 300_000 since start
@@ -142,7 +142,7 @@ describe('Poller', () => {
     expect(deps.recordSnapshots).toHaveBeenCalledWith(deps.db, codexStatus({ stale: true }))
   })
 
-  it('doubles the next limits interval after consecutive failures, capped, and resets after success', async () => {
+  it('retries limits every 60s while failing (fixed, not exponential), then resumes the 5min base after success', async () => {
     vi.useFakeTimers()
     const deps = makeDeps()
     const errorStatus: RateStatus = {
@@ -155,27 +155,27 @@ describe('Poller', () => {
     const poller = new Poller(deps)
     poller.start()
 
-    await vi.advanceTimersByTimeAsync(0) // tick 1 fails -> next delay 120_000
+    await vi.advanceTimersByTimeAsync(0) // tick 1 fails -> next delay fixed at 60_000 retry (not base 300_000)
     expect(deps.fetchClaudeLimits).toHaveBeenCalledTimes(1)
 
-    await vi.advanceTimersByTimeAsync(60_000) // not due yet (would've been due at 60_000 without backoff)
-    expect(deps.fetchClaudeLimits).toHaveBeenCalledTimes(1)
-
-    await vi.advanceTimersByTimeAsync(60_000) // total 120_000 -> tick 2 fires and fails -> next delay 240_000
+    await vi.advanceTimersByTimeAsync(60_000) // total 60_000 -> tick 2 fires and fails -> stays at 60_000 retry
     expect(deps.fetchClaudeLimits).toHaveBeenCalledTimes(2)
 
-    // now let it succeed -> backoff should reset to base 60_000
+    // now let it succeed -> next delay should return to base 300_000
     ;(deps.fetchClaudeLimits as ReturnType<typeof vi.fn>).mockResolvedValue(claudeStatus())
-    await vi.advanceTimersByTimeAsync(240_000) // total 360_000 -> tick 3 fires and succeeds
+    await vi.advanceTimersByTimeAsync(60_000) // total 120_000 -> tick 3 fires (still on retry interval) and succeeds
     expect(deps.fetchClaudeLimits).toHaveBeenCalledTimes(3)
 
-    await vi.advanceTimersByTimeAsync(60_000) // reset interval -> tick 4 due at base 60_000
+    await vi.advanceTimersByTimeAsync(60_000) // only 60s since success -> not due yet (base is 300s)
+    expect(deps.fetchClaudeLimits).toHaveBeenCalledTimes(3)
+
+    await vi.advanceTimersByTimeAsync(240_000) // total 300_000 since tick 3's success -> tick 4 due at base
     expect(deps.fetchClaudeLimits).toHaveBeenCalledTimes(4)
 
     poller.stop()
   })
 
-  describe('nextDelay (pure backoff formula)', () => {
+  describe('nextDelay (pure backoff formula, still used by usage ticks)', () => {
     it('returns the base interval with no failures', () => {
       expect(nextDelay(60_000, 0)).toBe(60_000)
     })
@@ -187,6 +187,20 @@ describe('Poller', () => {
     it('caps at 15 minutes', () => {
       expect(nextDelay(60_000, 4)).toBe(15 * 60_000) // uncapped would be 960_000
       expect(nextDelay(60_000, 10)).toBe(15 * 60_000)
+    })
+  })
+
+  describe('nextLimitsDelay (pure limits scheduling formula)', () => {
+    it('returns the base interval with no failures', () => {
+      expect(nextLimitsDelay(5 * 60_000, 0)).toBe(5 * 60_000)
+    })
+    it('fixes the retry interval (not exponential) while failing', () => {
+      expect(nextLimitsDelay(5 * 60_000, 1)).toBe(60_000)
+      expect(nextLimitsDelay(5 * 60_000, 2)).toBe(60_000)
+      expect(nextLimitsDelay(5 * 60_000, 10)).toBe(60_000)
+    })
+    it('keeps the (shorter) base interval instead of the retry interval when base < retry', () => {
+      expect(nextLimitsDelay(15_000, 1)).toBe(15_000)
     })
   })
 
@@ -258,10 +272,8 @@ describe('Poller', () => {
     expect(deps.fetchClaudeLimits).toHaveBeenCalledTimes(1)
     expect(deps.runCcusage).toHaveBeenCalledTimes(4)
 
-    await vi.advanceTimersByTimeAsync(60_000) // limits loop survived the throw
+    await vi.advanceTimersByTimeAsync(5 * 60_000) // both loops survived the throw and re-armed at the shared 5min base
     expect(deps.fetchClaudeLimits).toHaveBeenCalledTimes(2)
-
-    await vi.advanceTimersByTimeAsync(240_000) // usage loop survived too (total 300s)
     expect(deps.runCcusage).toHaveBeenCalledTimes(8)
     poller.stop()
   })
@@ -307,7 +319,7 @@ describe('Poller', () => {
     expect(poller.getState().limits.claude).toEqual(claudeStatus())
     expect(poller.getState().limits.codex).toEqual(codexStatus())
 
-    await vi.advanceTimersByTimeAsync(60_000) // 백오프 없이 기본 60s에 다음 틱
+    await vi.advanceTimersByTimeAsync(5 * 60_000) // 백오프 없이 기본 5분(300s)에 다음 틱
     expect(deps.fetchClaudeLimits).toHaveBeenCalledTimes(2)
     poller.stop()
   })

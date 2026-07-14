@@ -11,3 +11,10 @@ export function displayWindow(w: RateWindow | null, nowSec: number, live: boolea
   if (!live && w && w.resetsAt > 0 && w.resetsAt <= nowSec) return { window: w, resetPassed: true }
   return { window: w, resetPassed: false }
 }
+
+/** 스냅샷/스테일 카드 흐림 유예: 마지막 성공 후 GRACE_MS 안에는 흐리지 않는다. */
+export const SNAPSHOT_GRACE_MS = 10 * 60_000
+
+export function isDimmed(live: boolean, lastSeenAt: number, nowMs: number): boolean {
+  return !live && nowMs - lastSeenAt >= SNAPSHOT_GRACE_MS
+}
