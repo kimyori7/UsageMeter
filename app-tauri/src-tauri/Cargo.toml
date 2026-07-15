@@ -15,7 +15,7 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["tray-icon"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-# netgate(Task 5) 전용 — native-tls(=Windows schannel)라 기업 CA를 OS 저장소에서 신뢰한다
+# providers(http.rs)·netgate·cyclegate — native-tls(=Windows schannel)라 기업 CA를 OS 저장소에서 신뢰한다
 reqwest = { version = "0.12", features = ["json", "blocking"] }
 rusqlite = { version = "0.37", features = ["bundled"] }
 

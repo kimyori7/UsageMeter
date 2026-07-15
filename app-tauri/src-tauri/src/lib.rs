@@ -1,6 +1,7 @@
 mod commands;
 mod mock_state;
 pub mod paths;
+pub mod providers;
 pub mod settings;
 pub mod store;
 mod tray;
