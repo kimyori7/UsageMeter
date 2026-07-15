@@ -345,6 +345,49 @@ mod tests {
     }
 
     #[test]
+    fn codex_account_identity_survives_rollout_fallback() {
+        // 회귀 가드: wham 상태가 rollout으로 대체돼도 계정 신원은 wham 것이 사이클에 전달돼야 한다
+        // (신원 캡처가 폴백 분기 뒤로 밀리면 이 테스트가 잡는다)
+        let (_d, db) = test_db();
+        let state = Mutex::new(AppState::initial());
+        let seen: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let seen2 = seen.clone();
+        let cycle: Box<dyn Fn(&Mutex<Connection>, &ActiveResults, f64) -> Vec<AccountRateState> + Send> =
+            Box::new(move |_, active, _| {
+                *seen2.lock().unwrap() = active.codex.account.as_ref().map(|a| a.email.clone());
+                vec![]
+            });
+        let deps = LimitsDeps {
+            fetch_claude_limits: Box::new(|_| ok_status("claude", 1.0)),
+            fetch_codex_usage: Box::new(|_| CodexUsageResult {
+                account: Some(crate::providers::codex::usage_api::CodexAccountIdentity {
+                    id: "acc-9".into(),
+                    email: "fake-codex@example.com".into(),
+                    plan: None,
+                }),
+                status: err_status("codex", RateError::Network), // 상태는 버려지지만
+            }),
+            read_codex_limits: Box::new(|_| ok_status("codex", 33.0)), // rollout이 채택돼도
+            accounts_cycle: Some(cycle),
+        };
+        tick_limits(&deps, &db, &state, 0, 1000.0);
+        assert_eq!(seen.lock().unwrap().as_deref(), Some("fake-codex@example.com"));
+    }
+
+    #[test]
+    fn legacy_record_db_failure_does_not_break_tick() {
+        // 회귀 가드: 스냅샷 기록(DB) 실패는 fetch 성공 판정·상태 갱신과 무관해야 한다 (v1 catch)
+        let (_d, db) = test_db();
+        db.lock().unwrap().execute("DROP TABLE rate_snapshots", []).unwrap();
+        let state = Mutex::new(AppState::initial());
+        let deps = limits_deps(vec![ok_status("claude", 62.0)], vec![wham_ok(45.0)], vec![], None);
+        let failures = tick_limits(&deps, &db, &state, 0, 1000.0);
+        assert_eq!(failures, 0);
+        let st = state.lock().unwrap();
+        assert_eq!(st.limits.claude.as_ref().unwrap().windows[0].used_percent, 62.0);
+    }
+
+    #[test]
     fn legacy_mode_records_snapshots_directly() {
         // accounts_cycle 미제공(마이그레이션 실패 대응) — 성공 상태를 '' 태그로 직접 기록
         let (_d, db) = test_db();
