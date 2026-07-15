@@ -79,6 +79,18 @@ mod tests {
         });
         st.today.claude = TodayEntry { cost_usd: 8.42, total_tokens: 1523 };
         st.last_usage_sync_at = Some(6000.0);
+        // 렌더러 accountView가 accounts[].lastSeenAt/live를 읽는다(유예 판정) — 키 이름 핀.
+        st.accounts.push(crate::accounts_cycle::AccountRateState {
+            account: crate::accounts_cycle::AccountInfo {
+                provider: "claude".into(),
+                id: "acc-1".into(),
+                email: "fake@example.com".into(),
+                plan: None,
+            },
+            status: RateStatus::base("claude", 4000.0),
+            live: false,
+            last_seen_at: 4000.0,
+        });
         let v = serde_json::to_value(&st).unwrap();
         assert_eq!(v["limits"]["claude"]["windows"][0]["usedPercent"], 62.0);
         assert_eq!(v["limits"]["claude"]["windows"][0]["resetsAt"], 100.0);
@@ -86,6 +98,10 @@ mod tests {
         assert_eq!(v["today"]["claude"]["costUsd"], 8.42);
         assert_eq!(v["today"]["claude"]["totalTokens"], 1523);
         assert_eq!(v["lastUsageSyncAt"], 6000.0);
+        assert_eq!(v["accounts"][0]["lastSeenAt"], 4000.0);
+        assert_eq!(v["accounts"][0]["live"], false);
+        assert_eq!(v["accounts"][0]["account"]["email"], "fake@example.com");
+        assert!(v["accounts"][0]["account"].get("plan").is_none()); // v1 undefined → 키 생략
     }
 
     #[test]
