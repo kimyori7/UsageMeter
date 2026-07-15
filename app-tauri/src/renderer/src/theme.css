@@ -1,0 +1,826 @@
+/* 다크 테마 전용 — 팝업(Task 10)·대시보드(Task 11) 공용 스타일. 색상 팔레트는 다음으로 고정한다:
+   Claude #d97757, Codex #19c37d, 배경 #16161e / 카드 #1e1e2a / 보더 #2a2a38. 라이트 테마 없음. */
+
+:root {
+  --color-bg: #16161e;
+  --color-card-bg: #1e1e2a;
+  --color-border: #2a2a38;
+  --color-border-soft: #2e2e3e;
+  --color-text: #e6e6ef;
+  --color-text-muted: #a7a7ba;
+  --color-text-faint: #8b8b9e;
+  --color-action: #b9b9cc;
+  --color-claude: #d97757;
+  --color-claude-light: #e8a87c;
+  --color-codex: #19c37d;
+  --color-codex-light: #5fe3ad;
+  --color-warn: #e0a030;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family:
+    'Segoe UI',
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  overflow: hidden;
+  user-select: none;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* ── 팝업 ───────────────────────────────────────────────────────────── */
+
+.popup {
+  padding: 14px;
+}
+
+.popup-loading {
+  padding: 20px 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--color-text-faint);
+}
+
+.popup-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--color-text-faint);
+  padding-top: 9px;
+  border-top: 1px solid var(--color-border);
+}
+
+.popup-footer b {
+  color: var(--color-text);
+}
+
+.popup-actions button {
+  background: none;
+  border: none;
+  color: var(--color-action);
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 10px;
+}
+
+.popup-actions button:hover {
+  color: var(--color-text);
+}
+
+/* ── 프로바이더 카드 ────────────────────────────────────────────────── */
+
+.provider-card {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border-soft);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.provider-card--error {
+  filter: grayscale(1);
+  opacity: 0.65;
+}
+
+.provider-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.provider-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.provider-dot--claude {
+  background: var(--color-claude);
+}
+
+.provider-dot--codex {
+  background: var(--color-codex);
+}
+
+.provider-name {
+  font-weight: 600;
+  font-size: 13px;
+  flex: 1;
+}
+
+.provider-plan {
+  font-size: 10px;
+  color: var(--color-text-faint);
+  border: 1px solid #3a3a4e;
+  border-radius: 8px;
+  padding: 1px 7px;
+}
+
+.provider-caption {
+  font-size: 10px;
+  color: var(--color-text-faint);
+  margin-top: 6px;
+}
+
+.provider-caption--error {
+  color: var(--color-action);
+}
+
+.provider-cost {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--color-text-faint);
+  border-top: 1px solid var(--color-border);
+  padding-top: 7px;
+  margin-top: 9px;
+}
+
+.provider-cost b {
+  color: var(--color-text);
+}
+
+/* ── 게이지 ─────────────────────────────────────────────────────────── */
+/* gauge-row는 자신의 margin-bottom을 갖지 않는다 — 다음 요소(다른 gauge-row, caption, cost)가 항상
+   자기 자신의 margin-top으로 간격을 책임진다. 그래야 "마지막 게이지 줄만 margin-bottom:0"류의
+   :last-child 특수취급 없이도 목업과 동일한 간격이 나온다. */
+
+.gauge-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-bottom: 3px;
+}
+
+.gauge-label b {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.gauge-track {
+  height: 7px;
+  background: var(--color-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.gauge-fill {
+  height: 100%;
+  border-radius: 4px;
+}
+
+.gauge-fill--claude {
+  background: linear-gradient(90deg, var(--color-claude), var(--color-claude-light));
+}
+
+.gauge-fill--codex {
+  background: linear-gradient(90deg, var(--color-codex), var(--color-codex-light));
+}
+
+.gauge-row + .gauge-row {
+  margin-top: 7px;
+}
+
+/* 데이터에 없는 kind의 자리 표시 줄 — 라벨/트랙 구조는 유지하고 흐리게만(값은 —, 트랙은 빈 채로). */
+.gauge-row--absent {
+  opacity: 0.5;
+}
+
+/* ── 멀티 계정: provider 그룹 + 계정 카드 ──────────────────────────────── */
+
+.account-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.account-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px 0;
+}
+
+.account-group-today {
+  margin-left: auto;
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.account-card {
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--color-card-bg);
+}
+
+.account-card--snapshot {
+  opacity: 0.62;
+}
+
+.account-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.account-email {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-badge {
+  margin-left: auto;
+  font-size: 10px;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+.account-badge--live {
+  color: #4caf50;
+  opacity: 1;
+}
+
+.gauge-row--reset .gauge-label b {
+  color: #4caf50;
+}
+
+/* ── 대시보드 (Task 11) ─────────────────────────────────────────────── */
+/* html,body의 overflow:hidden(팝업용)은 그대로 두고, 대시보드는 내부(.dashboard-body)만 스크롤한다. */
+
+.dashboard {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  user-select: text; /* 팝업(body 기본값 none)과 달리 금액/경로를 복사할 수 있어야 한다 */
+}
+
+.dashboard-tabs {
+  display: flex;
+  gap: 2px;
+  background: #111118;
+  padding: 8px 10px 0;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.dashboard-tab {
+  padding: 6px 14px;
+  border-radius: 8px 8px 0 0;
+  color: var(--color-text-faint);
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.dashboard-tab--on {
+  background: var(--color-card-bg);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.dashboard-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+.dashboard-filters {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.dashboard-filters-spacer {
+  flex: 1;
+}
+
+.dashboard-empty,
+.folders-empty,
+.monthly-empty {
+  padding: 30px 0;
+  text-align: center;
+  color: var(--color-text-faint);
+  font-size: 12px;
+}
+
+/* ── 칩(기간/프로바이더 토글) — 목업 dashboard.html의 .chip 그대로 ──── */
+
+.chip {
+  border: 1px solid #3a3a4e;
+  border-radius: 10px;
+  padding: 2px 9px;
+  color: var(--color-text-faint);
+  background: none;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chip--on {
+  background: #2a2a3e;
+  color: var(--color-text);
+}
+
+.chips {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+/* ── 개요 탭: StatCard 3개 + 차트 ─────────────────────────────────── */
+
+.stat-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border-soft);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.stat-card-label {
+  font-size: 11px;
+  color: var(--color-text-faint);
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.stat-provider-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.stat-provider-row:last-child {
+  margin-bottom: 0;
+}
+
+.stat-provider-row b {
+  margin-left: auto;
+  font-size: 15px;
+}
+
+.usage-chart {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border-soft);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.chart-empty {
+  padding: 40px 0;
+  text-align: center;
+  color: var(--color-text-faint);
+  font-size: 12px;
+}
+
+.chart-tooltip {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border-soft);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--color-text);
+}
+
+.chart-tooltip-date {
+  color: var(--color-text-faint);
+  margin-bottom: 4px;
+}
+
+.chart-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chart-tooltip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.chart-tooltip-dot--claude {
+  background: var(--color-claude);
+}
+
+.chart-tooltip-dot--codex {
+  background: var(--color-codex);
+}
+
+.overview-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-faint);
+  margin: 16px 0 8px;
+}
+
+/* ── 일별 기록 탭 ─────────────────────────────────────────────────── */
+
+.daily-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.daily-table-wrap {
+  overflow-x: auto;
+}
+
+.daily-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.daily-table th,
+.daily-table td {
+  padding: 6px 8px;
+  text-align: right;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.daily-table th:first-child,
+.daily-table td:first-child {
+  text-align: left;
+}
+
+.daily-table thead th {
+  color: var(--color-text-faint);
+  font-weight: 600;
+}
+
+.daily-table-empty {
+  text-align: center;
+  color: var(--color-text-faint);
+  padding: 20px 0;
+}
+
+/* ── 폴더·세션 탭 — 목업 dashboard.html의 .frow/.dot/.fbar 그대로 ──── */
+
+.folders-tab {
+  display: flex;
+  flex-direction: column;
+}
+
+.frow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 8px;
+  border-radius: 7px;
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border-soft);
+  margin-bottom: 5px;
+}
+
+.frow:not(.child) {
+  cursor: pointer;
+}
+
+.frow.child {
+  margin-left: 22px;
+  background: #1a1a24;
+  border-color: transparent;
+  padding: 5px 8px;
+}
+
+.caret {
+  color: #6b6b7e;
+  width: 10px;
+  flex-shrink: 0;
+  font-size: 10px;
+}
+
+.fname {
+  flex: 1;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.frow.child .fname {
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.folders-loading {
+  color: var(--color-text-faint) !important;
+  font-weight: 400 !important;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 8px;
+}
+
+.dot--claude {
+  background: var(--color-claude);
+}
+
+.dot--codex {
+  background: var(--color-codex);
+}
+
+.dot--both {
+  background: linear-gradient(90deg, #d97757 50%, #19c37d 50%);
+}
+
+.fcost {
+  font-weight: 600;
+  min-width: 52px;
+  text-align: right;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.ftok {
+  color: #6b6b7e;
+  min-width: 64px;
+  text-align: right;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.fbar {
+  flex: 0 0 90px;
+  height: 5px;
+  background: var(--color-border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.fbar i {
+  display: block;
+  height: 100%;
+}
+
+/* ── 월 리포트 탭 ─────────────────────────────────────────────────── */
+
+.monthly-tab {
+  display: flex;
+  flex-direction: column;
+}
+
+.month-card {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border-soft);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.month-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.month-card-title {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.month-card-total {
+  color: var(--color-text-faint);
+  font-size: 12px;
+}
+
+.month-card-change {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+
+.month-card-change--up {
+  color: var(--color-warn);
+}
+
+.month-card-change--down {
+  color: var(--color-codex-light);
+}
+
+.month-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.month-table th,
+.month-table td {
+  padding: 4px 8px;
+  text-align: right;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.month-table th:first-child,
+.month-table td:first-child,
+.month-table th:nth-child(2),
+.month-table td:nth-child(2) {
+  text-align: left;
+}
+
+/* ── 설정 화면 — 앱 공통 카드 언어(#1e1e2a 카드 + 섹션 그룹) ────────── */
+
+.settings-pane {
+  max-width: 480px;
+}
+
+.settings-loading {
+  color: var(--color-text-faint);
+  padding: 20px 0;
+}
+
+.settings-card {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 18px 20px;
+}
+
+.settings-section + .settings-section {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.settings-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 10px;
+}
+
+/* 토글 행: 라벨 왼쪽, 스위치 오른쪽 — 행 전체가 클릭 영역(label). */
+.settings-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* 기본 체크박스를 앱 액센트 색 스위치로 재그리기(appearance:none + 트랙/노브). */
+.settings-toggle {
+  appearance: none;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--color-border);
+  border: 1px solid #3a3a4e;
+  position: relative;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.settings-toggle::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease;
+}
+
+.settings-toggle:checked {
+  background: var(--color-claude);
+  border-color: var(--color-claude);
+}
+
+.settings-toggle:checked::before {
+  transform: translateX(16px);
+  background: #16161e;
+}
+
+.settings-toggle:focus-visible {
+  outline: 2px solid var(--color-claude-light);
+  outline-offset: 2px;
+}
+
+/* 필드 행: 라벨 왼쪽, 입력+단위 오른쪽. */
+.settings-field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.settings-input-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-input-wrap input[type='number'] {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text);
+  padding: 6px 8px;
+  width: 76px;
+  font: inherit;
+  font-size: 13px;
+  text-align: right;
+}
+
+.settings-input-wrap input[type='number']:focus-visible {
+  outline: 2px solid var(--color-claude-light);
+  outline-offset: 1px;
+}
+
+.settings-unit {
+  font-size: 12px;
+  color: var(--color-text-faint);
+  width: 16px;
+}
+
+.settings-note {
+  font-size: 11px;
+  color: var(--color-text-faint);
+  margin: 4px 0 0;
+}
+
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
+.settings-save {
+  background: var(--color-claude);
+  color: #16161e;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 18px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.settings-save:hover {
+  background: var(--color-claude-light);
+}
+
+.settings-save--saved,
+.settings-save--saved:hover {
+  background: var(--color-codex);
+}
