@@ -19,6 +19,7 @@ serde_json = { version = "1", features = ["preserve_order"] }
 reqwest = { version = "0.12", features = ["json", "blocking"] }
 rusqlite = { version = "0.37", features = ["bundled"] }
 time = { version = "0.3", features = ["parsing"] }
+wait-timeout = "0.2"
 
 [dev-dependencies]
 tempfile = "3"
