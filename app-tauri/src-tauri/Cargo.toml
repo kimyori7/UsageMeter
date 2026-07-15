@@ -18,6 +18,7 @@ serde_json = { version = "1", features = ["preserve_order"] }
 # providers(http.rs)·netgate·cyclegate — native-tls(=Windows schannel)라 기업 CA를 OS 저장소에서 신뢰한다
 reqwest = { version = "0.12", features = ["json", "blocking"] }
 rusqlite = { version = "0.37", features = ["bundled"] }
+time = { version = "0.3", features = ["parsing"] }
 
 [dev-dependencies]
 tempfile = "3"
