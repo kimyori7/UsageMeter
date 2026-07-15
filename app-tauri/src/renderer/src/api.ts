@@ -62,10 +62,14 @@ const tauriApi: UsagemeterApi = {
     // listen은 비동기로 등록된다 — 등록 완료 전에 해제가 불리면 등록 즉시 풀도록 방어한다.
     let unlisten: (() => void) | null = null
     let cancelled = false
-    listen<AppState>('state', (event) => cb(event.payload)).then((fn) => {
-      if (cancelled) fn()
-      else unlisten = fn
-    })
+    listen<AppState>('state', (event) => cb(event.payload))
+      .then((fn) => {
+        if (cancelled) fn()
+        else unlisten = fn
+      })
+      .catch((err) => {
+        console.error('state listen failed:', err)
+      })
     return () => {
       cancelled = true
       if (unlisten) unlisten()

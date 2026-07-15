@@ -1,0 +1,7 @@
+{
+  "$schema": "gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "popup/dashboard 창의 core 기능(이벤트 수신 등) 허용",
+  "windows": ["popup", "dashboard"],
+  "permissions": ["core:default"]
+}
