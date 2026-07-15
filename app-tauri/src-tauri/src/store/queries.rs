@@ -71,6 +71,10 @@ pub fn daily_totals(conn: &Connection, opts: &RangeOpts) -> rusqlite::Result<Vec
         where_sql(&conditions)
     );
     let mut stmt = conn.prepare(&sql)?;
+    // totalTokens의 i64 읽기는 의도적 — rate_snapshots의 ts/resets_at만 v1(JS)의 REAL 유산 행이
+    // 있어 f64로 읽는다(snapshot_series 참조). 토큰 컬럼은 진짜 정수만 존재함이 실DB 스모크로
+    // 확인됨(REAL 행이 하나라도 있으면 collect()가 전체 쿼리를 Err로 만들어 즉시 드러난다).
+    // monthly_rollup/sessions_in_folder의 i64 읽기도 동일한 근거다.
     let rows = stmt.query_map(params_from_iter(params.iter()), |row| {
         Ok(json!({
             "date": row.get::<_, String>(0)?,
@@ -212,6 +216,7 @@ pub fn snapshot_series(
     )?;
     // v1(JS)이 소수부 있는 ms를 REAL로 저장한 행이 실DB에 존재 — i64 강타입 읽기는 거부한다.
     // rusqlite의 f64 FromSql은 INTEGER/REAL 저장 클래스를 모두 수용하므로 f64로 읽어 그대로 내보낸다.
+    // 정수값 f64는 JSON에 200.0처럼 직렬화되지만(v1은 200) JS Number로 파싱되면 동일값 — 수용된 차이.
     let rows = stmt.query_map(rusqlite::params![provider, window, from], |row| {
         Ok(json!({
             "ts": row.get::<_, f64>(0)?,
