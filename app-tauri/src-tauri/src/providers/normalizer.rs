@@ -144,11 +144,12 @@ mod tests {
         let j = json!({ "daily": [{
             "date": "2026-07-15", "costUSD": 3.25,
             "inputTokens": 1000, "outputTokens": 2000,
-            "models": { "gpt-5": {}, "gpt-5-mini": {} }
+            "models": { "gpt-5-mini": {}, "gpt-5": {} }
         }]});
         let rows = normalize_daily("codex", &j);
         assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].model, "gpt-5, gpt-5-mini"); // 문서 순서 유지(preserve_order)
+        // 문서 순서 유지(preserve_order) — 정렬 순서와 다른 삽입 순서라야 이 속성을 실제로 변별한다
+        assert_eq!(rows[0].model, "gpt-5-mini, gpt-5");
         assert_eq!(rows[0].cost_usd, 3.25);
         assert_eq!(rows[0].input_tokens, 1000);
         assert_eq!(rows[0].cache_tokens, 0);
