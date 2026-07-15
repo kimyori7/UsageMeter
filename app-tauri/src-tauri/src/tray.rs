@@ -24,7 +24,7 @@ pub fn create_tray(app: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id.as_ref() {
             "open" => windows::ensure_popup_shown(app),
             "dashboard" => windows::show_dashboard(app),
-            "refresh" => { /* 1단계 no-op — 4단계에서 배선 */ }
+            "refresh" => app.state::<crate::poller::thread::RefreshTx>().signal_all(),
             "quit" => app.exit(0),
             _ => {}
         })

@@ -1,13 +1,12 @@
 pub mod accounts_cycle;
 pub mod ccusage;
 mod commands;
-mod mock_state;
 pub mod paths;
 pub mod poller;
 pub mod providers;
 pub mod settings;
 pub mod store;
-pub mod tooltip;
+mod tooltip;
 mod tray;
 pub mod vault;
 mod windows;
@@ -20,15 +19,42 @@ pub fn run() {
     let data_dir = paths::data_dir();
     std::fs::create_dir_all(&data_dir).expect("데이터 디렉터리 생성 실패");
     let mut conn = store::db::open_db(&data_dir.join("usage.db")).expect("usage.db 열기 실패");
-    if !store::db::apply_multi_account_schema(&mut conn) {
+    let multi_account = store::db::apply_multi_account_schema(&mut conn);
+    if !multi_account {
         eprintln!("[UsageMeter] multi-account schema migration failed — feature disabled");
     }
 
+    // 폴링 주기는 부팅 시 1회 읽는다(v1 동일 — 설정 화면의 "재시작 후 적용" 문구가 참이 되도록).
+    let settings = settings::load_settings();
+    let limits_ms = settings["limitsIntervalSec"].as_u64().unwrap_or(300) * 1000;
+    let usage_ms = settings["usageIntervalMin"].as_u64().unwrap_or(5) * 60_000;
+
+    let (limits_tx, limits_rx) = std::sync::mpsc::channel();
+    let (usage_tx, usage_rx) = std::sync::mpsc::channel();
+    let accounts_dir = data_dir.join("accounts");
+
     tauri::Builder::default()
         .manage(Db(std::sync::Mutex::new(conn)))
-        .setup(|app| {
+        .manage(poller::thread::SharedState(std::sync::Mutex::new(
+            poller::state::AppState::initial(),
+        )))
+        .manage(poller::thread::RefreshTx { limits: limits_tx, usage: usage_tx })
+        .setup(move |app| {
             app.manage(windows::TrayBounds::default());
             tray::create_tray(app.handle())?;
+            // 트레이 생성 후에 폴러를 띄운다 — emit_state가 tray_by_id("main")을 찾는다.
+            poller::thread::spawn_limits(
+                app.handle().clone(),
+                poller::wiring::build_limits_deps(multi_account, accounts_dir.clone()),
+                limits_ms,
+                limits_rx,
+            );
+            poller::thread::spawn_usage(
+                app.handle().clone(),
+                poller::wiring::build_usage_deps(),
+                usage_ms,
+                usage_rx,
+            );
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

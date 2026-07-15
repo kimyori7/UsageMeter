@@ -4,18 +4,22 @@ use serde::Deserialize;
 use serde_json::Value;
 use tauri::{AppHandle, State, Window};
 
+use crate::poller::state::AppState;
+use crate::poller::thread::{RefreshTx, SharedState};
 use crate::settings;
 use crate::store::queries::{self, RangeOpts};
-use crate::{mock_state, windows, Db};
+use crate::{windows, Db};
 
 #[tauri::command]
-pub fn get_state() -> Value {
-    mock_state::fixture()
+pub fn get_state(state: State<'_, SharedState>) -> AppState {
+    // 첫 틱 전엔 initial()(v1 초기 상태와 동일) — 렌더러 useAppState는 push가 오면 덮어쓴다.
+    state.0.lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
 #[tauri::command]
-pub fn refresh() {
-    // 1단계 no-op — 4단계에서 poller.refresh_now로 교체.
+pub fn refresh(tx: State<'_, RefreshTx>) {
+    // fire-and-forget(D10): 두 폴링 스레드를 깨우고 즉시 반환 — 결과는 state 이벤트로 도착.
+    tx.signal_all();
 }
 
 #[tauri::command]
