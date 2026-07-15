@@ -37,7 +37,7 @@ pub fn record_snapshots(
         })?;
         for w in windows {
             // v1(JS)이 소수부 있는 ms를 REAL로 저장한 행이 실DB에 존재 — resets_at을 i64 강타입으로
-            // 읽으면 거부된다. f64로 읽고 신규 poll의 i64 값을 f64로 캐스트해 비교한다.
+            // 읽으면 거부된다. f64로 읽어 RateWindow의 f64 값과 직접 비교한다.
             let prev: Option<(f64, f64)> = if v2 {
                 select
                     .query_row(rusqlite::params![provider, w.kind, account_id], |r| {
