@@ -5,6 +5,7 @@ pub mod providers;
 pub mod settings;
 pub mod store;
 mod tray;
+pub mod vault;
 mod windows;
 
 use tauri::Manager;

@@ -1,3 +1,4 @@
+pub mod accounts;
 pub mod daily;
 pub mod db;
 pub mod queries;
