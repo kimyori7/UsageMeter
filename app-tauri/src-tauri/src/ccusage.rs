@@ -112,6 +112,22 @@ mod tests {
     }
 
     #[test]
+    fn large_output_exceeding_pipe_buffer_is_read_fully() {
+        let tmp = tempfile::tempdir().unwrap();
+        // 리더 스레드의 존재 이유 검증(회귀 가드): 파이프 버퍼(수십 KB)보다 큰 출력(~230KB)을
+        // 자식이 끝까지 쓸 수 있어야 한다. 리더 없이 wait 후 동기 읽기로 바꾸면 자식이 write에서
+        // 멈춰 여기서 타임아웃 Err로 떨어진다.
+        let body = "@echo [\r\n\
+            @for /L %%i in (1,1,4000) do @echo \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\r\n\
+            @echo \"end\"]\r\n";
+        let p = bat(tmp.path(), "big.bat", body);
+        let v = run_ccusage_with_timeout(&p, &[], Duration::from_secs(30)).unwrap();
+        let arr = v.as_array().unwrap();
+        assert_eq!(arr.len(), 4001);
+        assert_eq!(arr.last().unwrap(), "end");
+    }
+
+    #[test]
     fn bin_path_is_next_to_current_exe() {
         let p = ccusage_bin_path().unwrap();
         assert!(p.ends_with("ccusage.exe"));
