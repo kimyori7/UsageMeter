@@ -288,6 +288,8 @@ fn push_inactive_result(
 
 /// 프로바이더별 격리(설계 D8): 한 블록의 DB 오류(v1의 동기 throw 대응물)가 다른 블록을 막지 않는다.
 /// 블록 실패 시 그 블록에서 이미 push된 상태는 유지된다 (v1 외곽 catch 동일).
+/// 주의: 격리는 블록(프로바이더) 단위다 — v1의 계정별 내부 catch와 달리 루프 중간 DB 오류(?-전파)는
+/// 그 프로바이더의 남은 계정 처리를 중단한다 (마이그레이션 후 DB에선 사실상 도달 불가).
 pub fn run_accounts_cycle(deps: &CycleDeps, active: &ActiveResults) -> Vec<AccountRateState> {
     let mut states = vec![];
     let _ = claude_block(deps, active, &mut states);

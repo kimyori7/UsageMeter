@@ -9,7 +9,8 @@ pub fn default_codex_auth_path() -> PathBuf {
         .join("auth.json")
 }
 
-#[derive(Debug, Clone, PartialEq)]
+// Debug 미파생: 토큰 보유 구조체를 {:?}로 찍는 코드가 컴파일되지 않게 한다 (claude 쪽과 동일한 차단).
+#[derive(Clone, PartialEq)]
 pub struct CodexAuth {
     pub access_token: String,
     pub account_id: String,
@@ -42,7 +43,9 @@ mod tests {
         )
         .unwrap();
         let a = read_codex_auth(&p).unwrap();
-        assert_eq!(a, CodexAuth { access_token: "FAKE-AT".into(), account_id: "acc-1".into() });
+        // 구조체 단위 assert_eq!는 Debug를 요구하므로 필드별로 비교한다
+        assert_eq!(a.access_token, "FAKE-AT");
+        assert_eq!(a.account_id, "acc-1");
     }
 
     #[test]
