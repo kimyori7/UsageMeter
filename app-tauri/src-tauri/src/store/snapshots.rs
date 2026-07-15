@@ -45,7 +45,9 @@ pub fn record_snapshots(
              VALUES (?1, ?2, ?3, ?4, ?5)"
         })?;
         for w in windows {
-            let prev: Option<(f64, i64)> = if v2 {
+            // v1(JS)이 소수부 있는 ms를 REAL로 저장한 행이 실DB에 존재 — resets_at을 i64 강타입으로
+            // 읽으면 거부된다. f64로 읽고 신규 poll의 i64 값을 f64로 캐스트해 비교한다.
+            let prev: Option<(f64, f64)> = if v2 {
                 select
                     .query_row(rusqlite::params![provider, w.kind, account_id], |r| {
                         Ok((r.get(0)?, r.get(1)?))
@@ -59,7 +61,7 @@ pub fn record_snapshots(
                     .optional()?
             };
             if let Some((p, r)) = prev {
-                if p == w.used_percent && r == w.resets_at {
+                if p == w.used_percent && r == (w.resets_at as f64) {
                     continue;
                 }
             }
@@ -88,7 +90,9 @@ pub fn latest_account_snapshot(
         "SELECT window, used_percent, resets_at, MAX(ts) AS ts FROM rate_snapshots
          WHERE provider = ?1 AND account_id = ?2 GROUP BY window",
     )?;
-    let rows: Vec<(String, f64, i64, i64)> = stmt
+    // v1(JS)이 소수부 있는 ms를 REAL로 저장한 행이 실DB에 존재 — resets_at/ts를 i64 강타입으로
+    // 읽으면 거부된다. rusqlite의 f64 FromSql은 INTEGER/REAL 저장 클래스를 모두 수용한다.
+    let rows: Vec<(String, f64, f64, f64)> = stmt
         .query_map(rusqlite::params![provider, account_id], |r| {
             Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))
         })?
@@ -96,8 +100,9 @@ pub fn latest_account_snapshot(
     if rows.is_empty() {
         return Ok(None);
     }
-    let fetched_at = rows.iter().map(|r| r.3).max().unwrap_or(0);
-    let mut windows: Vec<&(String, f64, i64, i64)> = rows
+    // NaN 입력 불가(rows 비어있지 않음 보장 후 f64::MIN에서 fold) — f64는 Ord 미구현이라 max() 불가.
+    let fetched_at = rows.iter().map(|r| r.3).fold(f64::MIN, f64::max);
+    let mut windows: Vec<&(String, f64, f64, f64)> = rows
         .iter()
         .filter(|r| r.0 == "session_5h" || r.0 == "weekly")
         .collect();
@@ -149,10 +154,55 @@ mod tests {
         record_snapshots(&mut conn, "claude", 1000, &[mk("weekly", 1.0)], "a").unwrap();
         record_snapshots(&mut conn, "claude", 2000, &[mk("weekly", 2.0), mk("session_5h", 9.0)], "a").unwrap();
         let snap = latest_account_snapshot(&conn, "claude", "a").unwrap().unwrap();
-        assert_eq!(snap["fetchedAt"], 2000);
+        assert_eq!(snap["fetchedAt"], 2000.0);
         let windows = snap["windows"].as_array().unwrap();
         assert_eq!(windows[0]["kind"], "session_5h"); // session_5h 먼저
         assert_eq!(windows[1]["usedPercent"], 2.0); // weekly는 최신값
         assert!(latest_account_snapshot(&conn, "claude", "none").unwrap().is_none());
+    }
+
+    #[test]
+    fn latest_account_snapshot_reads_real_typed_columns() {
+        // v1(JS)이 소수부 있는 ms를 REAL로 저장한 실DB 행 재현 — resets_at/ts를 i64 강타입으로
+        // 읽으면 거부된다. record_snapshots를 거치지 않고 v1처럼 raw REAL 값을 직접 심는다.
+        let dir = tempfile::tempdir().unwrap();
+        let mut conn = crate::store::db::open_db(&dir.path().join("u.db")).unwrap();
+        assert!(crate::store::db::apply_multi_account_schema(&mut conn));
+        conn.execute(
+            "INSERT INTO rate_snapshots(ts, provider, window, used_percent, resets_at, account_id)
+             VALUES (2000.5, 'claude', 'session_5h', 33.0, 999.5, 'a')",
+            [],
+        )
+        .unwrap();
+        let snap = latest_account_snapshot(&conn, "claude", "a").unwrap().unwrap();
+        assert_eq!(snap["fetchedAt"], 2000.5);
+        let windows = snap["windows"].as_array().unwrap();
+        assert_eq!(windows[0]["kind"], "session_5h");
+        assert_eq!(windows[0]["resetsAt"], 999.5);
+        assert_eq!(windows[0]["usedPercent"], 33.0);
+    }
+
+    #[test]
+    fn record_snapshots_tolerates_real_typed_prev_resets_at() {
+        // 직전 행의 resets_at이 REAL 타입(v1 유산, 소수부 있는 값)이어도 dedup SELECT가
+        // InvalidColumnType으로 거부되지 않아야 한다. 단, 소수부가 있는 REAL 값은 SQLite의
+        // INTEGER affinity 변환으로 정수값이 될 수 없으므로(정수로 손실 없이 변환 가능한 REAL은
+        // 저장 시 자동으로 INTEGER가 됨) 새 정수 poll 값(999)과는 다른 값 — dedup은 skip이 아니라
+        // "에러 없이 새 행 기록"으로 이어진다. dedup-skip 자체는 record_dedups_unchanged_and_records_changed에서
+        // 이미 커버한다 — 이 테스트의 목적은 REAL 타입 내성(크래시 없음)이다.
+        let dir = tempfile::tempdir().unwrap();
+        let mut conn = crate::store::db::open_db(&dir.path().join("u.db")).unwrap();
+        assert!(crate::store::db::apply_multi_account_schema(&mut conn));
+        conn.execute(
+            "INSERT INTO rate_snapshots(ts, provider, window, used_percent, resets_at, account_id)
+             VALUES (1000.5, 'claude', 'session_5h', 10.0, 999.5, 'acc-1')",
+            [],
+        )
+        .unwrap();
+        let w = vec![RateWindow { kind: "session_5h".into(), used_percent: 10.0, resets_at: 999 }];
+        record_snapshots(&mut conn, "claude", 2000, &w, "acc-1").unwrap(); // 에러 없이 진행돼야 한다
+        let n: i64 =
+            conn.query_row("SELECT COUNT(*) FROM rate_snapshots", [], |r| r.get(0)).unwrap();
+        assert_eq!(n, 2); // resets_at(999.5 vs 999)이 달라 dedup 미스 → 새 행 기록, 크래시 없음이 핵심
     }
 }

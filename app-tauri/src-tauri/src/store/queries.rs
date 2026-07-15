@@ -210,9 +210,11 @@ pub fn snapshot_series(
          WHERE provider = ? AND window = ? AND ts >= ?
          ORDER BY ts ASC",
     )?;
+    // v1(JS)이 소수부 있는 ms를 REAL로 저장한 행이 실DB에 존재 — i64 강타입 읽기는 거부한다.
+    // rusqlite의 f64 FromSql은 INTEGER/REAL 저장 클래스를 모두 수용하므로 f64로 읽어 그대로 내보낸다.
     let rows = stmt.query_map(rusqlite::params![provider, window, from], |row| {
         Ok(json!({
-            "ts": row.get::<_, i64>(0)?,
+            "ts": row.get::<_, f64>(0)?,
             "usedPercent": row.get::<_, f64>(1)?,
         }))
     })?;
@@ -334,7 +336,25 @@ mod tests {
         let (_d, conn) = seeded();
         let rows = snapshot_series(&conn, "claude", "session_5h", 150).unwrap();
         assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0]["ts"], 200);
+        assert_eq!(rows[0]["ts"], 200.0);
         assert_eq!(rows[0]["usedPercent"], 20.0);
+    }
+
+    #[test]
+    fn snapshot_series_reads_real_typed_ts() {
+        // v1(JS)이 소수부 있는 ms를 REAL로 저장한 실DB 행 재현 — i64 강타입 읽기는 거부한다.
+        let (_d, conn) = seeded();
+        conn.execute(
+            "INSERT INTO rate_snapshots(ts, provider, window, used_percent, resets_at)
+             VALUES (150.5, 'claude', 'session_5h', 33.0, 999.5)",
+            [],
+        )
+        .unwrap();
+        // from=150 범위에는 시드된 ts=200 행도 포함되므로(ORDER BY ts ASC) REAL 행이 먼저 온다.
+        let rows = snapshot_series(&conn, "claude", "session_5h", 150).unwrap();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0]["ts"], 150.5);
+        assert_eq!(rows[0]["usedPercent"], 33.0);
+        assert_eq!(rows[1]["ts"], 200.0);
     }
 }
