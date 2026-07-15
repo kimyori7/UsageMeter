@@ -98,4 +98,18 @@ mod tests {
         save_settings_to(&nested, &json!({})).unwrap();
         assert!(nested.join("settings.json").exists());
     }
+
+    #[test]
+    fn clamp_exact_boundaries() {
+        // P2 이월: clamp 최소치의 정확 경계 — 15/1은 그대로, 바로 아래는 끌어올림
+        let v = normalize(&json!({ "limitsIntervalSec": 15, "usageIntervalMin": 1 }));
+        assert_eq!(v["limitsIntervalSec"], 15);
+        assert_eq!(v["usageIntervalMin"], 1);
+        let v = normalize(&json!({ "limitsIntervalSec": 14, "usageIntervalMin": 0.4 }));
+        assert_eq!(v["limitsIntervalSec"], 15);
+        assert_eq!(v["usageIntervalMin"], 1);
+        let v = normalize(&json!({ "limitsIntervalSec": 16, "usageIntervalMin": 2 }));
+        assert_eq!(v["limitsIntervalSec"], 16);
+        assert_eq!(v["usageIntervalMin"], 2);
+    }
 }
