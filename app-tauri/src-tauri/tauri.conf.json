@@ -10,7 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [{ "title": "UsageMeter", "width": 400, "height": 300 }],
+    "windows": [],
     "security": { "csp": null }
   },
   "bundle": {
