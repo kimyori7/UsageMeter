@@ -1,5 +1,7 @@
 mod commands;
 mod mock_state;
+pub mod paths;
+pub mod store;
 mod tray;
 mod windows;
 
