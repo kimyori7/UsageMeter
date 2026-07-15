@@ -1,0 +1,20 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>UsageMeter</title>
+    <!-- 프레임리스 창이 JS 번들 로드 전 흰 화면으로 번쩍이지 않도록 인라인 지정 (v1과 동일) -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #16161e;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- v1과 동일한 디렉터리 깊이 유지 — 렌더러의 ../../../ type import가 스텁에 닿게 한다 -->
+    <script type="module" src="/src/renderer/src/main.tsx"></script>
+  </body>
+</html>
