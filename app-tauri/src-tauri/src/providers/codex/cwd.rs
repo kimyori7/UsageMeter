@@ -78,6 +78,21 @@ mod tests {
     }
 
     #[test]
+    fn jsonl_retry_appends_even_when_name_contains_dots() {
+        let tmp = tempfile::tempdir().unwrap();
+        // 회귀 가드: with_extension이면 마지막 점 뒤가 치환돼(sess.2026.jsonl) 못 찾는다 —
+        // 문자열 append만 sess.2026.07.jsonl에 도달한다
+        write_rollout(
+            tmp.path(),
+            "2026/07/15",
+            "sess.2026.07.jsonl",
+            r#"{"payload":{"cwd":"D:\\proj\\dotted"}}"#,
+        );
+        let r = CwdResolver::new(tmp.path().to_path_buf());
+        assert_eq!(r.resolve("2026/07/15", "sess.2026.07").as_deref(), Some("D:\\proj\\dotted"));
+    }
+
+    #[test]
     fn resolves_exact_path_and_top_level_cwd_fallback() {
         let tmp = tempfile::tempdir().unwrap();
         // 확장자 포함 정확 경로 + payload 없이 톱레벨 cwd만 있는 구형 포맷
