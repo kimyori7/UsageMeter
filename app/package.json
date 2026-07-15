@@ -1,7 +1,7 @@
 {
   "name": "usagemeter",
   "productName": "UsageMeter",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Claude/Codex 사용량을 트레이에서 보여주는 상주형 Electron 앱",
   "main": "./out/main/index.js",
   "author": "kimyori",
