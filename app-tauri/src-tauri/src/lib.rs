@@ -8,8 +8,18 @@ mod windows;
 
 use tauri::Manager;
 
+pub struct Db(pub std::sync::Mutex<rusqlite::Connection>);
+
 pub fn run() {
+    let data_dir = paths::data_dir();
+    std::fs::create_dir_all(&data_dir).expect("데이터 디렉터리 생성 실패");
+    let mut conn = store::db::open_db(&data_dir.join("usage.db")).expect("usage.db 열기 실패");
+    if !store::db::apply_multi_account_schema(&mut conn) {
+        eprintln!("[UsageMeter] multi-account schema migration failed — feature disabled");
+    }
+
     tauri::Builder::default()
+        .manage(Db(std::sync::Mutex::new(conn)))
         .setup(|app| {
             app.manage(windows::TrayBounds::default());
             tray::create_tray(app.handle())?;
