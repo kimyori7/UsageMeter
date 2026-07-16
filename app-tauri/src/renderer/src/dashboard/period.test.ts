@@ -40,6 +40,12 @@ describe('periodRange', () => {
     expect(periodRange('90d', today)).toEqual(lastNDaysRange(90, today))
   })
 
+  it("'1d'/'3d'는 lastNDaysRange(n)과 동일 — '1d'는 오늘 하루", () => {
+    expect(periodRange('1d', today)).toEqual(lastNDaysRange(1, today))
+    expect(periodRange('1d', today)).toEqual({ from: '2026-07-13', to: '2026-07-13' })
+    expect(periodRange('3d', today)).toEqual(lastNDaysRange(3, today))
+  })
+
   it("'all'은 경계 없음(빈 객체)", () => {
     expect(periodRange('all', today)).toEqual({})
   })
@@ -59,6 +65,11 @@ describe('periodFromMs', () => {
   it("'30d'/'90d'도 lastNDaysRange(n).from 자정의 epoch ms", () => {
     expect(periodFromMs('30d', today)).toBe(new Date(2026, 5, 14).getTime())
     expect(periodFromMs('90d', today)).toBe(new Date(2026, 3, 15).getTime())
+  })
+
+  it("'1d'/'3d'도 lastNDaysRange(n).from 자정의 epoch ms", () => {
+    expect(periodFromMs('1d', today)).toBe(new Date(2026, 6, 13).getTime())
+    expect(periodFromMs('3d', today)).toBe(new Date(2026, 6, 11).getTime())
   })
 })
 
