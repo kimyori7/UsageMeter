@@ -20,6 +20,9 @@ reqwest = { version = "0.12", features = ["json", "blocking"] }
 rusqlite = { version = "0.37", features = ["bundled"] }
 time = { version = "0.3", features = ["parsing"] }
 wait-timeout = "0.2"
+# 5단계 마감: 단일 인스턴스(두 번째 실행 → 기존 인스턴스에 신호)·자동시작(HKCU Run 레지스트리)
+tauri-plugin-single-instance = "2"
+tauri-plugin-autostart = "2"
 
 [dev-dependencies]
 tempfile = "3"

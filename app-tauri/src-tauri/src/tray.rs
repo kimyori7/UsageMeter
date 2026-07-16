@@ -25,7 +25,14 @@ pub fn create_tray(app: &AppHandle) -> tauri::Result<()> {
             "open" => windows::ensure_popup_shown(app),
             "dashboard" => windows::show_dashboard(app),
             "refresh" => app.state::<crate::poller::thread::RefreshTx>().signal_all(),
-            "quit" => app.exit(0),
+            "quit" => {
+                // v1 quit()의 tray.destroy() 대응: exit(0)은 drop을 건너뛰므로 아이콘을 먼저 지워
+                // 죽은 프로세스의 유령 트레이 아이콘(호버 전까지 잔존)을 막는다.
+                if let Some(tray) = app.tray_by_id("main") {
+                    let _ = tray.set_visible(false);
+                }
+                app.exit(0);
+            }
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {

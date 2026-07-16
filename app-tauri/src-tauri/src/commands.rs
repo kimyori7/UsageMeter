@@ -3,6 +3,7 @@
 use serde::Deserialize;
 use serde_json::Value;
 use tauri::{AppHandle, State, Window};
+use tauri_plugin_autostart::ManagerExt;
 
 use crate::poller::state::AppState;
 use crate::poller::thread::{RefreshTx, SharedState};
@@ -88,10 +89,19 @@ pub fn get_settings() -> Value {
 }
 
 #[tauri::command]
-pub fn set_settings(settings: Value) -> Result<Value, String> {
+pub fn set_settings(app: AppHandle, settings: Value) -> Result<Value, String> {
     // 파라미터명은 렌더러 invoke 키 {settings}와 일치해야 한다. 로컬 변수 settings와
     // 모듈 경로 crate::settings는 Rust 네임스페이스가 달라(value vs type/module) 충돌하지 않는다.
     crate::settings::save_settings(&settings).map_err(|e| e.to_string())?;
     // clamp된 실제 저장값을 돌려준다 — 렌더러가 낙관적 업데이트로 오차값을 갖지 않도록 (v1 ipc.ts 동일)
-    Ok(crate::settings::load_settings())
+    let saved = crate::settings::load_settings();
+    // v1 saveSettings 패리티: 저장할 때마다 로그인 항목을 현재 값으로 동기화(true=등록, false=해제).
+    // 실패는 저장을 실패시키지 않는다 — v1 setLoginItemSettings도 결과를 확인하지 않는다.
+    let autostart = app.autolaunch();
+    let _ = if saved["autoStart"].as_bool().unwrap_or(false) {
+        autostart.enable()
+    } else {
+        autostart.disable()
+    };
+    Ok(saved)
 }

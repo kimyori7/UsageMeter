@@ -42,6 +42,20 @@ pub fn run() {
     let accounts_dir = data_dir.join("accounts");
 
     tauri::Builder::default()
+        // 단일 인스턴스는 최우선 등록(공식 권고) — 두 번째 실행은 여기서 차단되고 첫 인스턴스에 신호만 보낸다.
+        // v1 second-instance 계약(index.ts): 팝업 "표시 보장"(토글 아님), 트레이 준비 전이면 무시.
+        // TrayBounds는 setup에서 manage되므로 try_state로 준비 여부를 판별한다(state()는 미관리 시 panic).
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if app.try_state::<windows::TrayBounds>().is_some() {
+                windows::ensure_popup_shown(app);
+            }
+        }))
+        // 자동시작: 등록/해제는 set_settings 커맨드가 수행(v1 saveSettings 패리티). --start-minimized는
+        // 부팅이 항상 트레이 온리라 현재 no-op이지만 v1과 동일한 인자 계약을 유지한다.
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec!["--start-minimized"]),
+        ))
         .manage(Db(std::sync::Mutex::new(conn)))
         .manage(poller::thread::SharedState(std::sync::Mutex::new(
             poller::state::AppState::initial(),
