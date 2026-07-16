@@ -96,6 +96,7 @@ export default function SnapshotChart({ data }: SnapshotChartProps): React.JSX.E
           <Tooltip
             content={(props) => <ChartTooltip {...props} />}
             cursor={{ stroke: '#3a3a4e' }}
+            isAnimationActive={false}
           />
           <Legend wrapperStyle={{ fontSize: 11, color: '#8b8b9e' }} />
           {/* 90%: popup/format.ts WARN_PERCENT와 동일한 임계값(경고색 전환 지점). */}

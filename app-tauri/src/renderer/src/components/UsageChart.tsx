@@ -90,6 +90,7 @@ export default function UsageChart({ data, metric }: UsageChartProps): React.JSX
           <Tooltip
             content={(props) => <ChartTooltip {...props} metric={metric} />}
             cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+            isAnimationActive={false}
           />
           <Legend wrapperStyle={{ fontSize: 11, color: '#8b8b9e' }} />
           {/* 스택 순서 고정: Claude(바닥, 밑면=축과 맞닿아 각지게)→Codex(꼭대기, 바깥쪽 끝만 둥글게). */}
