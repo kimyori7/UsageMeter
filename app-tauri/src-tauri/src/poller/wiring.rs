@@ -1,5 +1,5 @@
 // 실부품 조립 — v1 main/index.ts boot()의 폴러 deps 배선 대응. 조립 형태는 P3 게이트로 실증된
-// src/bin/cyclegate.rs와 동일하다(활성 claude = ensure_fresh_token→fetch_claude_limits 조합).
+// examples/cyclegate.rs와 동일하다(활성 claude = ensure_fresh_token→fetch_claude_limits 조합).
 // 토큰은 이 클로저들 내부(Rust 메모리)에만 머물고 반환값은 전부 RateStatus/AccountRateState다.
 use crate::accounts_cycle::{
     run_accounts_cycle, AccountRateState, ActiveResults, ClaudeCycleDeps, CodexCycleDeps, CycleDeps,

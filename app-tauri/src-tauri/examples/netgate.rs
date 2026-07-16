@@ -1,4 +1,6 @@
 // 기업 프록시 환경 게이트 — reqwest(native-tls=schannel)가 기업 프록시 SSL 개입을 통과하는지 1회 실조회.
+// 사용법: cargo run --example netgate
+// examples/에 두는 이유: src/bin/의 cargo bin 타깃은 tauri 번들러가 인스톨러에 동봉한다(P5 게이트에서 적발).
 // 보안: 토큰은 메모리에서만 사용. 출력은 HTTP 상태코드 + 최상위 JSON 키 이름만.
 use std::fs;
 

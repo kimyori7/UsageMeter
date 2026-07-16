@@ -1,5 +1,6 @@
 // 3단계 게이트 — 실계정 accounts-cycle 1회 실행 (컨트롤러 전용 실행).
-// 사용법: cargo run --bin cyclegate -- <data-dir-복사본>
+// 사용법: cargo run --example cyclegate -- <data-dir-복사본>
+// examples/에 두는 이유: src/bin/의 cargo bin 타깃은 tauri 번들러가 인스톨러에 동봉한다(P5 게이트에서 적발).
 // <data-dir>은 %APPDATA%\UsageMeter의 *복사본*이어야 한다 — 실 DB/금고에 쓰지 않기 위함.
 // (자격증명 원본 ~/.claude/.credentials.json, ~/.codex/auth.json은 v1 앱과 동일한 방식으로 읽는다.
 //  클로드 토큰이 만료 임박이면 v1과 동일한 구조 보존 원자 쓰기로 갱신될 수 있다 — 프로덕션 동작 그대로.)
