@@ -1,7 +1,10 @@
 // 팝업(트레이 위, frameless, blur 숨김)·대시보드(일반 창, 있으면 focus) 관리.
 // 좌표는 전부 논리(logical) 단위 — 물리(physical) 좌표는 호출부에서 scale_factor로 변환해 넘긴다.
 
-use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::webview::PageLoadEvent;
+use tauri::{
+    AppHandle, LogicalPosition, LogicalSize, Manager, Theme, WebviewUrl, WebviewWindowBuilder,
+};
 
 pub const POPUP_WIDTH: f64 = 356.0;
 pub const POPUP_INIT_HEIGHT: f64 = 400.0;
@@ -88,6 +91,15 @@ pub fn ensure_popup_shown(app: &AppHandle) {
         .skip_taskbar(true)
         .always_on_top(true)
         .visible(false)
+        // v1 ready-to-show 패리티: 콘텐츠가 그려진 뒤에야 처음 표시한다. 생성 직후 show하면
+        // 빈(흰) 창이 깜빡이고, 웹뷰 초기화 중 포커스 요동이 아래 blur 숨김을 발동시켜
+        // "몇 번 뜨려다 닫히는" 첫 클릭 증상이 된다.
+        .on_page_load(|window, payload| {
+            if matches!(payload.event(), PageLoadEvent::Finished) {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        })
         .build();
     let Ok(win) = win else { return };
     let w = win.clone();
@@ -97,8 +109,6 @@ pub fn ensure_popup_shown(app: &AppHandle) {
         }
         _ => {}
     });
-    let _ = win.show();
-    let _ = win.set_focus();
 }
 
 /// 렌더러가 보고한 콘텐츠 높이로 content-fit — 호출 창이 팝업일 때만 (v1 sender 검증과 동일).
@@ -136,6 +146,16 @@ pub fn show_dashboard(app: &AppHandle) {
     )
     .title("UsageMeter")
     .inner_size(DASHBOARD_WIDTH, DASHBOARD_HEIGHT)
+    // 앱 UI가 상시 다크라 타이틀바도 다크로 고정 — 윈도우 기본 흰 타이틀바가 본문과 충돌한다.
+    .theme(Some(Theme::Dark))
+    .visible(false)
+    // v1 ready-to-show 패리티: 로드 완료 후 표시(빈 흰 창 깜빡임 방지).
+    .on_page_load(|window, payload| {
+        if matches!(payload.event(), PageLoadEvent::Finished) {
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+    })
     .build();
 }
 
