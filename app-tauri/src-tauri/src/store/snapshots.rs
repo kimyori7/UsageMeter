@@ -100,12 +100,20 @@ pub fn latest_account_snapshot(
     }
     // NaN 입력 불가(rows 비어있지 않음 보장 후 f64::MIN에서 fold) — f64는 Ord 미구현이라 max() 불가.
     let fetched_at = rows.iter().map(|r| r.3).fold(f64::MIN, f64::max);
+    // weekly_*는 모델 스코프 주간 창(예: weekly_fable) — 표시 순서는 세션 → 주간 → 스코프(이름순).
+    fn rank(kind: &str) -> u8 {
+        match kind {
+            "session_5h" => 0,
+            "weekly" => 1,
+            _ => 2,
+        }
+    }
     let mut kept: Vec<(String, f64, f64)> = rows
         .into_iter()
-        .filter(|r| r.0 == "session_5h" || r.0 == "weekly")
+        .filter(|r| r.0 == "session_5h" || r.0 == "weekly" || r.0.starts_with("weekly_"))
         .map(|(kind, used, resets, _)| (kind, used, resets))
         .collect();
-    kept.sort_by_key(|r| if r.0 == "session_5h" { 0 } else { 1 });
+    kept.sort_by(|a, b| rank(&a.0).cmp(&rank(&b.0)).then_with(|| a.0.cmp(&b.0)));
     let windows = kept
         .into_iter()
         .map(|(kind, used_percent, resets_at)| RateWindow { kind, used_percent, resets_at })
@@ -155,6 +163,27 @@ mod tests {
         assert_eq!(snap.windows[0].kind, "session_5h"); // session_5h 먼저
         assert_eq!(snap.windows[1].used_percent, 2.0); // weekly는 최신값
         assert!(latest_account_snapshot(&conn, "claude", "none").unwrap().is_none());
+    }
+
+    #[test]
+    fn latest_account_snapshot_keeps_model_scoped_weekly_windows() {
+        // weekly_fable 같은 모델 스코프 창이 필터에서 버려지지 않고 세션→주간→스코프 순으로 남아야 한다
+        let dir = tempfile::tempdir().unwrap();
+        let mut conn = crate::store::db::open_db(&dir.path().join("u.db")).unwrap();
+        assert!(crate::store::db::apply_multi_account_schema(&mut conn));
+        let mk = |kind: &str, p: f64| RateWindow { kind: kind.into(), used_percent: p, resets_at: 999.0 };
+        record_snapshots(
+            &mut conn,
+            "claude",
+            1000,
+            &[mk("weekly_fable", 24.0), mk("weekly", 18.0), mk("session_5h", 37.0), mk("unknown_kind", 1.0)],
+            "a",
+        )
+        .unwrap();
+        let snap = latest_account_snapshot(&conn, "claude", "a").unwrap().unwrap();
+        let kinds: Vec<&str> = snap.windows.iter().map(|w| w.kind.as_str()).collect();
+        assert_eq!(kinds, vec!["session_5h", "weekly", "weekly_fable"]); // unknown_kind는 제외
+        assert_eq!(snap.windows[2].used_percent, 24.0);
     }
 
     #[test]

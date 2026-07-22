@@ -16,6 +16,7 @@ import {
   type Period
 } from './period'
 import { displayPercent, fmtMoney } from '../popup/format'
+import { scopedModelName, scopedWeeklyWindows } from '../popup/scopedWindows'
 import type { ProviderId, WindowKind } from '../../../providers/types'
 
 interface OverviewTabProps {
@@ -89,12 +90,24 @@ export default function OverviewTab({ period, providers }: OverviewTabProps): Re
 
         <StatCard label="주간 한도">
           {providers.map((p) => {
-            const weekly = appState?.limits[p]?.windows.find((w) => w.kind === 'weekly') ?? null
+            const windows = appState?.limits[p]?.windows ?? []
+            const weekly = windows.find((w) => w.kind === 'weekly') ?? null
             return (
-              <div key={p} className="stat-provider-row">
-                <span className={`provider-dot provider-dot--${p}`} />
-                <span>{PROVIDER_LABEL[p]}</span>
-                <b>{weekly ? `${displayPercent(weekly.usedPercent)}%` : '—'}</b>
+              <div key={p}>
+                <div className="stat-provider-row">
+                  <span className={`provider-dot provider-dot--${p}`} />
+                  <span>{PROVIDER_LABEL[p]}</span>
+                  <b>{weekly ? `${displayPercent(weekly.usedPercent)}%` : '—'}</b>
+                </div>
+                {scopedWeeklyWindows(windows).map((w) => (
+                  <div key={w.kind} className="stat-provider-row">
+                    <span className={`provider-dot provider-dot--${p}`} />
+                    <span>
+                      {PROVIDER_LABEL[p]} · {scopedModelName(w.kind)}
+                    </span>
+                    <b>{displayPercent(w.usedPercent)}%</b>
+                  </div>
+                ))}
               </div>
             )
           })}

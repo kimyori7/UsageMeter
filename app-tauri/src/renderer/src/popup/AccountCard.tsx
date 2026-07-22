@@ -1,9 +1,11 @@
 // 계정 카드 하나(스펙 §UI). ProviderCard와 달리 "오늘 사용"이 없다(비용은 provider 단위 —
 // 그룹 헤더가 담당). 스냅샷 카드는 마지막 성공 후 SNAPSHOT_GRACE_MS(10분)가 지나야 흐려진다(isDimmed) —
 // 그 전까지는 밝은 카드 + "HH:MM 기준" 스탬프. 리셋 지난 창은 게이지 대신 문구.
+import { Fragment } from 'react'
 import GaugeBar from './GaugeBar'
 import { displayWindow, isDimmed, type DisplayWindow } from './accountView'
 import { fmtClock } from './format'
+import { scopedWeeklyWindows, scopedWindowLabel } from './scopedWindows'
 import type { AccountRateState } from '../../../main/accounts-cycle'
 
 interface AccountCardProps {
@@ -25,6 +27,11 @@ export default function AccountCard({ entry, now }: AccountCardProps): React.JSX
     nowSec,
     live
   )
+  // 모델 스코프 주간 창(weekly_fable 등) — 있을 때만 추가 줄, 리셋 판정은 고정 창과 동일 규칙.
+  const scoped = scopedWeeklyWindows(status.windows).map((w) => ({
+    kind: w.kind,
+    display: displayWindow(w, nowSec, live)
+  }))
 
   const gauge = (label: string, d: DisplayWindow): React.JSX.Element =>
     d.resetPassed ? (
@@ -54,6 +61,9 @@ export default function AccountCard({ entry, now }: AccountCardProps): React.JSX
       </div>
       {gauge('5시간 세션', session)}
       {gauge('주간 한도', weekly)}
+      {scoped.map(({ kind, display }) => (
+        <Fragment key={kind}>{gauge(scopedWindowLabel(kind), display)}</Fragment>
+      ))}
       {!live && status.error === 'no-data' && (
         <div className="provider-caption">기록된 수치 없음 — 이 계정으로 로그인하면 수집됩니다</div>
       )}

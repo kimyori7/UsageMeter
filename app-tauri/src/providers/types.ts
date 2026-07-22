@@ -4,8 +4,9 @@
 /** Which usage provider a piece of data came from. */
 export type ProviderId = 'claude' | 'codex'
 
-/** Which rate-limit window a RateWindow entry represents. */
-export type WindowKind = 'session_5h' | 'weekly'
+/** Which rate-limit window a RateWindow entry represents.
+ *  `weekly_${model}` is a model-scoped weekly window (e.g. `weekly_fable`). */
+export type WindowKind = 'session_5h' | 'weekly' | `weekly_${string}`
 
 export interface RateWindow {
   kind: WindowKind // which window this entry describes

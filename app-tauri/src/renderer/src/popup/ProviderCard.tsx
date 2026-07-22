@@ -1,11 +1,14 @@
-// 프로바이더 카드 하나: 헤더(색점+이름+플랜 배지) / 게이지 두 줄(5시간 세션 + 주간 한도, 항상) / "오늘 사용" 비용.
-// 확정 레이아웃은 카드당 두 게이지 고정 — 데이터에 없는 kind는 줄을 없애지 않고 흐린 자리 표시 줄로 렌더해
-// 카드 구조가 로딩/에러/부분 데이터 어느 상태에서든 안정되게 유지한다. windows 배열 순서를 가정하지 않고
-// kind로 명시 선택한다(providers/types.ts 계약). error가 있어도 windows가 남아있으면(poller의 직전 성공값
-// 유지 정책, staleFallback) 게이지를 계속 그린다 — 빈 화면 금지(스펙 §7). "오늘 사용"은 ccusage 기반 별도
-// 파이프라인(AppState.today)이라 limits 에러와 무관하게 항상 표시한다. stale은 에러가 아니라 옅은 캡션만.
+// 프로바이더 카드 하나: 헤더(색점+이름+플랜 배지) / 게이지(5시간 세션 + 주간 한도 두 줄 고정, 모델 스코프
+// 주간 창은 데이터에 있을 때만 추가 줄) / "오늘 사용" 비용.
+// 고정 두 줄은 데이터에 없는 kind라도 줄을 없애지 않고 흐린 자리 표시 줄로 렌더해 카드 구조가 로딩/에러/부분
+// 데이터 어느 상태에서든 안정되게 유지한다. 스코프 창(weekly_fable 등)은 계정/플랜에 따라 존재 자체가 달라
+// 자리 표시 없이 있을 때만 그린다. windows 배열 순서를 가정하지 않고 kind로 명시 선택한다(providers/types.ts
+// 계약). error가 있어도 windows가 남아있으면(poller의 직전 성공값 유지 정책, staleFallback) 게이지를 계속
+// 그린다 — 빈 화면 금지(스펙 §7). "오늘 사용"은 ccusage 기반 별도 파이프라인(AppState.today)이라 limits
+// 에러와 무관하게 항상 표시한다. stale은 에러가 아니라 옅은 캡션만.
 import GaugeBar from './GaugeBar'
 import { fmtClock, fmtMoney, fmtTokens } from './format'
+import { scopedWeeklyWindows, scopedWindowLabel } from './scopedWindows'
 import type { ProviderId, RateStatus } from '../../../providers/types'
 
 const PROVIDER_LABEL: Record<ProviderId, string> = { claude: 'Claude', codex: 'Codex' }
@@ -63,6 +66,15 @@ export default function ProviderCard({
 
       <GaugeBar label="5시간 세션" providerId={providerId} rateWindow={session} now={nowSec} />
       <GaugeBar label="주간 한도" providerId={providerId} rateWindow={weekly} now={nowSec} />
+      {scopedWeeklyWindows(windows).map((w) => (
+        <GaugeBar
+          key={w.kind}
+          label={scopedWindowLabel(w.kind)}
+          providerId={providerId}
+          rateWindow={w}
+          now={nowSec}
+        />
+      ))}
 
       {caption(status, now)}
 

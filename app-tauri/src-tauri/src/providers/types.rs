@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RateWindow {
-    pub kind: String, // "session_5h" | "weekly"
+    pub kind: String, // "session_5h" | "weekly" | "weekly_<모델>" (모델 스코프 주간, 예: weekly_fable)
     pub used_percent: f64,
     // epoch sec. v1(JS) number는 f64이고 실DB 스냅샷 폴백 경로가 REAL(소수부) 값을 나를 수 있어 f64 (설계 D2).
     pub resets_at: f64,

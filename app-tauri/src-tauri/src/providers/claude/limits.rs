@@ -30,6 +30,37 @@ fn win(kind: &str, raw: &Value) -> Option<RateWindow> {
     })
 }
 
+/// "Fable" → "weekly_fable" — DB(window 컬럼)·렌더러가 이 kind 문자열로 창을 식별한다.
+fn scoped_kind(display_name: &str) -> String {
+    let slug: String = display_name
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '_' })
+        .collect();
+    format!("weekly_{slug}")
+}
+
+/// 새 limits[] 배열에서 모델 스코프 주간 창(weekly_scoped, 예: Fable 주간 한도)만 취한다.
+/// session/weekly_all 항목은 레거시 five_hour/seven_day와 중복이라 제외. 모델명이 없는
+/// 스코프 항목(surface 스코프 등)은 건너뛴다.
+fn scoped_windows(body: &Value) -> Vec<RateWindow> {
+    let empty = vec![];
+    body["limits"]
+        .as_array()
+        .unwrap_or(&empty)
+        .iter()
+        .filter(|l| l["kind"].as_str() == Some("weekly_scoped"))
+        .filter_map(|l| {
+            let name = l["scope"]["model"]["display_name"].as_str()?;
+            Some(RateWindow {
+                kind: scoped_kind(name),
+                used_percent: l["percent"].as_f64()?,
+                resets_at: to_epoch_sec(&l["resets_at"]),
+            })
+        })
+        .collect()
+}
+
 pub fn fetch_claude_limits(
     transport: &dyn Transport,
     token: Option<&str>,
@@ -60,11 +91,12 @@ pub fn fetch_claude_limits(
         Ok(v) => v,
         Err(_) => return RateStatus { error: Some(RateError::Network), ..base },
     };
-    let windows: Vec<RateWindow> =
+    let mut windows: Vec<RateWindow> =
         [win("session_5h", &body["five_hour"]), win("weekly", &body["seven_day"])]
             .into_iter()
             .flatten()
             .collect();
+    windows.extend(scoped_windows(&body));
     let plan = body["subscriptionType"].as_str().map(String::from);
     let error = if windows.is_empty() { Some(RateError::NoData) } else { None };
     RateStatus { windows, plan, error, ..base }
@@ -100,6 +132,52 @@ mod tests {
                 RateWindow { kind: "weekly".into(), used_percent: 41.0, resets_at: 1784246400.0 },
             ]
         );
+    }
+
+    // 실 응답(2026-07-22 관측) 축약: limits[]에 session/weekly_all(레거시 필드와 중복)과
+    // 모델 스코프 주간 창(Fable)이 함께 온다. epoch: 2026-07-28T11:00:00Z = 1785236400
+    const SCOPED_BODY: &str = r#"{
+        "five_hour": { "utilization": 37, "resets_at": "2026-07-22T12:09:59Z" },
+        "seven_day": { "utilization": 18, "resets_at": "2026-07-28T10:59:59Z" },
+        "limits": [
+            { "kind": "session", "group": "session", "percent": 37,
+              "resets_at": "2026-07-22T12:09:59Z", "scope": null },
+            { "kind": "weekly_all", "group": "weekly", "percent": 18,
+              "resets_at": "2026-07-28T10:59:59Z", "scope": null },
+            { "kind": "weekly_scoped", "group": "weekly", "percent": 24,
+              "resets_at": "2026-07-28T11:00:00Z",
+              "scope": { "model": { "id": null, "display_name": "Fable" }, "surface": null } },
+            { "kind": "weekly_scoped", "group": "weekly", "percent": 99,
+              "resets_at": "2026-07-28T11:00:00Z",
+              "scope": { "model": null, "surface": "cowork" } }
+        ]
+    }"#;
+
+    #[test]
+    fn maps_model_scoped_weekly_windows_from_limits_array() {
+        let t = MockTransport::returning(200, SCOPED_BODY);
+        let s = fetch_claude_limits(&t, Some("FAKE"), 0.0);
+        assert_eq!(s.error, None);
+        // 레거시 두 창 + Fable 스코프 창. session/weekly_all은 중복이라 다시 세지 않고,
+        // 모델 없는 스코프 항목(surface)은 건너뛴다.
+        assert_eq!(s.windows.len(), 3);
+        assert_eq!(
+            s.windows[2],
+            RateWindow { kind: "weekly_fable".into(), used_percent: 24.0, resets_at: 1785236400.0 }
+        );
+    }
+
+    #[test]
+    fn scoped_kind_slug_is_lowercase_alnum() {
+        assert_eq!(scoped_kind("Fable"), "weekly_fable");
+        assert_eq!(scoped_kind("Opus 4.5"), "weekly_opus_4_5"); // 공백·점 → '_'
+    }
+
+    #[test]
+    fn body_without_limits_array_keeps_legacy_windows_only() {
+        let t = MockTransport::returning(200, OK_BODY);
+        let s = fetch_claude_limits(&t, Some("FAKE"), 0.0);
+        assert_eq!(s.windows.len(), 2); // 기존 응답 형태에서 회귀 없음
     }
 
     #[test]
