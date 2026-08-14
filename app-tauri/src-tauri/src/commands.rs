@@ -23,8 +23,11 @@ pub fn refresh(tx: State<'_, RefreshTx>) {
     tx.signal_all();
 }
 
+// async 필수 — 동기 command는 메인 스레드에서 돌고, 그 안에서 WebviewWindowBuilder::build를
+// 부르면 Windows에서 데드락된다(창 생성이 이벤트 루프를 필요로 하는데 그 루프가 IPC 응답에
+// 묶여 있음). async command는 별도 스레드에서 실행되어 안전하다.
 #[tauri::command]
-pub fn open_dashboard(app: AppHandle) {
+pub async fn open_dashboard(app: AppHandle) {
     windows::show_dashboard(&app);
 }
 
