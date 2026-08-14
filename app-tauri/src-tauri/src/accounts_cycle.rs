@@ -30,6 +30,9 @@ pub struct AccountInfo {
 pub struct AccountRateState {
     pub account: AccountInfo,
     pub status: RateStatus,
+    /// 이 계정이 현재 OS 자격증명(cred/auth 파일)의 주인인가 — 팝업의 "1계정만 표시" 선별 기준.
+    /// live와 다르다: 볼트 토큰으로 조회에 성공한 비활성 계정도 live=true가 될 수 있다.
+    pub active: bool,
     pub live: bool,
     pub last_seen_at: f64,
 }
@@ -105,12 +108,14 @@ fn snapshot_state(
                 fetched_at: s.fetched_at,
                 ..RateStatus::base(provider, s.fetched_at)
             },
+            active: false,
             live: false,
             last_seen_at: s.fetched_at,
         },
         None => AccountRateState {
             account,
             status: RateStatus::with_error(provider, rec.last_seen_at, RateError::NoData),
+            active: false,
             live: false,
             last_seen_at: rec.last_seen_at,
         },
@@ -167,6 +172,7 @@ fn register_active(
                 plan: identity.plan,
             },
             status: s.clone(),
+            active: true,
             live: s.error.is_none(),
             last_seen_at: s.fetched_at,
         });
@@ -278,6 +284,7 @@ fn push_inactive_result(
                     plan: rec.plan.clone(),
                 },
                 status,
+                active: false,
                 live: true,
                 last_seen_at,
             });
@@ -404,6 +411,7 @@ mod tests {
 
         let claude = states.iter().find(|s| s.account.id == "cl-active").unwrap();
         assert!(claude.live);
+        assert!(claude.active);
         assert_eq!(claude.account.email, "active@a.com");
         assert_eq!(claude.last_seen_at, 5000.0);
         assert!(f.vault.has_copy("claude", "cl-active"));
@@ -475,6 +483,7 @@ mod tests {
         let states = run_accounts_cycle(&deps, &active_both());
         let old = states.iter().find(|s| s.account.id == "cl-old").unwrap();
         assert!(old.live);
+        assert!(!old.active); // 볼트 조회 성공(live)이어도 현재 로그인 계정은 아니다
         assert_eq!(ensure_calls.borrow()[0], f.vault.cred_path("claude", "cl-old"));
         assert!(snapshot_count(&f, "cl-old") > 0);
     }

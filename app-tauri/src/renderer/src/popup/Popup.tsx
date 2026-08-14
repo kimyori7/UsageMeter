@@ -1,6 +1,8 @@
-// 트레이 팝업 루트 — provider 그룹(계정 카드 목록) + 하단 합계·액션 푸터. 계정이 발견되지 않은
-// provider는 기존 ProviderCard로 폴백한다(하위 호환, 스펙 §UI). 실데이터는 useAppState()만 사용.
+// 트레이 팝업 루트 — provider 그룹(계정 카드) + 하단 합계·액션 푸터. 계정 카드는 프로바이더당
+// 1장만 보여준다(pickPopupAccount — 현재 로그인 계정 우선, 없으면 최근 스냅샷). 계정이 발견되지
+// 않은 provider는 기존 ProviderCard로 폴백한다(하위 호환, 스펙 §UI). 실데이터는 useAppState()만 사용.
 import AccountCard from './AccountCard'
+import { pickPopupAccount } from './accountPick'
 import ProviderCard from './ProviderCard'
 import { fmtMoney, fmtTokens } from './format'
 import { useNow } from './useNow'
@@ -27,10 +29,8 @@ export default function Popup(): React.JSX.Element {
   const accounts = state.accounts ?? []
 
   const providerSection = (p: ProviderId): React.JSX.Element => {
-    const group = accounts
-      .filter((a) => a.account.provider === p)
-      .sort((a, b) => Number(b.live) - Number(a.live) || b.lastSeenAt - a.lastSeenAt)
-    if (group.length === 0) {
+    const shown = pickPopupAccount(accounts.filter((a) => a.account.provider === p))
+    if (!shown) {
       return (
         <ProviderCard providerId={p} status={state.limits[p]} today={state.today[p]} now={now} />
       )
@@ -44,9 +44,7 @@ export default function Popup(): React.JSX.Element {
             오늘 <b>{fmtMoney(state.today[p].costUsd)}</b> · {fmtTokens(state.today[p].totalTokens)}
           </span>
         </div>
-        {group.map((a) => (
-          <AccountCard key={`${p}:${a.account.id}`} entry={a} now={now} />
-        ))}
+        <AccountCard key={`${p}:${shown.account.id}`} entry={shown} now={now} />
       </div>
     )
   }

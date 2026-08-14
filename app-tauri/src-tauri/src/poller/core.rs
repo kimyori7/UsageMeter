@@ -432,6 +432,7 @@ mod tests {
                         plan: None,
                     },
                     status: RateStatus::base("claude", 1000.0),
+                    active: true,
                     live: true,
                     last_seen_at: 1000.0,
                 }]

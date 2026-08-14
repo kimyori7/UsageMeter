@@ -88,6 +88,7 @@ mod tests {
                 plan: None,
             },
             status: RateStatus::base("claude", 4000.0),
+            active: false,
             live: false,
             last_seen_at: 4000.0,
         });
@@ -100,6 +101,8 @@ mod tests {
         assert_eq!(v["lastUsageSyncAt"], 6000.0);
         assert_eq!(v["accounts"][0]["lastSeenAt"], 4000.0);
         assert_eq!(v["accounts"][0]["live"], false);
+        assert_eq!(v["accounts"][0]["active"], false); // 팝업 1계정 선별이 읽는 키
+
         assert_eq!(v["accounts"][0]["account"]["email"], "fake@example.com");
         assert!(v["accounts"][0]["account"].get("plan").is_none()); // v1 undefined → 키 생략
     }

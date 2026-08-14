@@ -12,6 +12,8 @@ export interface AccountInfo {
 export interface AccountRateState {
   account: AccountInfo
   status: RateStatus
+  /** 현재 OS 자격증명의 주인(로그인 중인 계정)인가 — live(조회 성공)와 별개의 축. */
+  active: boolean
   live: boolean
   lastSeenAt: number
 }
