@@ -189,6 +189,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut conn = crate::store::db::open_db(&dir.path().join("u.db")).unwrap();
         assert!(crate::store::db::apply_multi_account_schema(&mut conn));
+        assert!(crate::store::db::apply_session_models_schema(&conn));
         (dir, Mutex::new(conn))
     }
 

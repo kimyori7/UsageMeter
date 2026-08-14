@@ -41,4 +41,5 @@ export interface SessionRow {
   endedAt: string | null // ISO timestamp, session end (null if unknown)
   totalTokens: number // total tokens used in the session
   costUsd: number // cost in USD
+  models: string // model names used, joined by ', ' — empty when unknown
 }

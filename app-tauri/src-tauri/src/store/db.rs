@@ -27,6 +27,31 @@ pub fn open_db(path: &Path) -> rusqlite::Result<Connection> {
     Ok(conn)
 }
 
+/// 세션 모델 컬럼 추가 — 기존 usage.db에는 session_usage.models가 없다. 위 SCHEMA는
+/// CREATE TABLE IF NOT EXISTS라 이미 있는 테이블에는 아무 영향이 없으므로(신규 DB만 해당)
+/// 실사용 DB는 이 ALTER로만 컬럼을 얻는다. 실패 시 false — 호출자는 모델 표시만 끄고 계속.
+/// 미상 모델은 NULL이 아닌 ''(정규화가 못 채운 과거 행과 동일 표현).
+pub fn apply_session_models_schema(conn: &Connection) -> bool {
+    let has_models = {
+        let Ok(mut stmt) = conn.prepare("PRAGMA table_info(session_usage)") else {
+            return false;
+        };
+        let Ok(names) = stmt.query_map([], |r| r.get::<_, String>(1)) else {
+            return false;
+        };
+        // stmt보다 먼저 끝나야 하므로 결과를 변수에 담아 반환한다(apply_multi_account_schema와 동일 패턴).
+        let found = names.filter_map(Result::ok).any(|n| n == "models");
+        found
+    };
+    if has_models {
+        return true;
+    }
+    conn.execute_batch(
+        "ALTER TABLE session_usage ADD COLUMN models TEXT NOT NULL DEFAULT ''",
+    )
+    .is_ok()
+}
+
 /// 멀티 계정 스키마 v2 — v1 db.ts applyMultiAccountSchema의 이식. 단일 트랜잭션,
 /// 실패 시 원상 롤백 + false (호출자는 멀티 계정 기능만 끄고 계속 — 데이터 파괴 금지).
 /// rate_snapshots는 PK에 account_id를 넣기 위해 재생성. 계정 미상은 NULL이 아닌 ''(PK 참여).
@@ -144,6 +169,35 @@ mod tests {
             )
             .unwrap();
         assert_eq!(n, 2);
+    }
+
+    #[test]
+    fn session_models_migration_adds_column_and_preserves_rows() {
+        let dir = tempfile::tempdir().unwrap();
+        let conn = open_db(&temp_db_path(&dir)).unwrap();
+        // 마이그레이션 전 스키마(7컬럼)로 들어간 기존 행 — 실사용 DB의 상태
+        conn.execute(
+            "INSERT INTO session_usage VALUES
+             ('s1','claude','D:/proj','2026-07-15T00:00:00Z','2026-07-15T01:00:00Z',600,3.0)",
+            [],
+        )
+        .unwrap();
+        assert!(apply_session_models_schema(&conn));
+        let (tokens, models): (i64, String) = conn
+            .query_row("SELECT total_tokens, models FROM session_usage WHERE session_id='s1'", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(tokens, 600); // 기존 행 보존
+        assert_eq!(models, ""); // 과거 행은 빈 문자열(미상)
+    }
+
+    #[test]
+    fn session_models_migration_is_idempotent() {
+        let dir = tempfile::tempdir().unwrap();
+        let conn = open_db(&temp_db_path(&dir)).unwrap();
+        assert!(apply_session_models_schema(&conn));
+        assert!(apply_session_models_schema(&conn)); // 두 번째 호출도 true (ALTER 재실행 없음)
     }
 
     #[test]

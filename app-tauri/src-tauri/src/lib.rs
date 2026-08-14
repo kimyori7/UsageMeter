@@ -23,6 +23,11 @@ pub fn run() {
     if !multi_account {
         eprintln!("[UsageMeter] multi-account schema migration failed — feature disabled");
     }
+    // 세션 모델 컬럼은 조회(sessions_in_folder)가 이미 참조하므로 실패 시 폴더·세션 탭이 비게 된다 —
+    // 조용히 넘기지 않고 로그로 드러낸다.
+    if !store::db::apply_session_models_schema(&conn) {
+        eprintln!("[UsageMeter] session models schema migration failed — 폴더·세션 조회가 실패할 수 있음");
+    }
 
     // 폴링 주기는 부팅 시 1회 읽는다(v1 동일 — 설정 화면의 "재시작 후 적용" 문구가 참이 되도록).
     let settings = settings::load_settings();

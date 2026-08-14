@@ -164,7 +164,7 @@ pub fn sessions_in_folder(
     conditions.extend(date_clauses);
     params.extend(date_params);
     let sql = format!(
-        "SELECT session_id, provider, folder, started_at, ended_at, total_tokens, cost_usd
+        "SELECT session_id, provider, folder, started_at, ended_at, total_tokens, cost_usd, models
          FROM session_usage WHERE {}",
         conditions.join(" AND ")
     );
@@ -178,6 +178,9 @@ pub fn sessions_in_folder(
             "endedAt": row.get::<_, Option<String>>(4)?,
             "totalTokens": row.get::<_, i64>(5)?,
             "costUsd": row.get::<_, f64>(6)?,
+            // 마이그레이션 이전 행은 NULL일 수 있다(ALTER의 DEFAULT는 새 행에만 적용되지 않지만,
+            // 수동 편집·다른 경로로 들어온 NULL을 방어) — 빈 문자열로 통일해 렌더러 분기를 단순화한다.
+            "models": row.get::<_, Option<String>>(7)?.unwrap_or_default(),
         }))
     })?;
     rows.collect()
@@ -235,16 +238,19 @@ mod tests {
     fn seeded() -> (tempfile::TempDir, Connection) {
         let dir = tempfile::tempdir().unwrap();
         let conn = open_db(&dir.path().join("usage.db")).unwrap();
+        assert!(crate::store::db::apply_session_models_schema(&conn));
+        // session_usage는 컬럼을 명시한다 — 위치 기반 VALUES는 마이그레이션으로 컬럼이 늘 때마다 깨진다.
         conn.execute_batch(
             "INSERT INTO daily_usage VALUES
                ('2026-07-14','claude','opus',10,20,30,1.0),
                ('2026-07-14','codex','gpt',1,2,3,0.5),
                ('2026-07-15','claude','opus',100,200,300,2.0),
                ('2026-07-15','claude','sonnet',10,10,10,0.25);
-             INSERT INTO session_usage VALUES
-               ('s1','claude','D:/proj/a','2026-07-15T00:00:00Z','2026-07-15T03:00:00Z',600,3.0),
-               ('s2','codex','D:/proj/a',NULL,'2026-07-15T04:00:00Z',60,0.5),
-               ('s3','claude','D:/proj/b','2026-07-01T00:00:00Z','2026-07-01T01:00:00Z',30,0.1);
+             INSERT INTO session_usage
+               (session_id, provider, folder, started_at, ended_at, total_tokens, cost_usd, models) VALUES
+               ('s1','claude','D:/proj/a','2026-07-15T00:00:00Z','2026-07-15T03:00:00Z',600,3.0,'claude-fable-5'),
+               ('s2','codex','D:/proj/a',NULL,'2026-07-15T04:00:00Z',60,0.5,'gpt-5.6-sol'),
+               ('s3','claude','D:/proj/b','2026-07-01T00:00:00Z','2026-07-01T01:00:00Z',30,0.1,'');
              INSERT INTO rate_snapshots(ts, provider, window, used_percent, resets_at)
                VALUES (100,'claude','session_5h',10.0,999),
                       (200,'claude','session_5h',20.0,999),
@@ -320,6 +326,7 @@ mod tests {
         assert!(rows.iter().any(|r| r["sessionId"] == "s1"));
         let s1 = rows.iter().find(|r| r["sessionId"] == "s1").unwrap();
         assert_eq!(s1["startedAt"], "2026-07-15T00:00:00Z");
+        assert_eq!(s1["models"], "claude-fable-5");
         let s2 = rows.iter().find(|r| r["sessionId"] == "s2");
         if let Some(s2) = s2 {
             assert_eq!(s2["startedAt"], serde_json::Value::Null); // NULL → JSON null

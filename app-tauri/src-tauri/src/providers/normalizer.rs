@@ -68,6 +68,23 @@ pub fn normalize_daily(provider: &str, cli_json: &Value) -> Vec<DailyRow> {
     }
 }
 
+/// claude 세션의 모델 목록 — modelsUsed 배열이 정식 필드이고, 없으면 modelBreakdowns의
+/// modelName으로 폴백한다(둘 다 없는 세션은 빈 문자열 = 미상).
+fn claude_session_models(sess: &Value) -> String {
+    let empty = vec![];
+    let names: Vec<String> = match sess["modelsUsed"].as_array() {
+        Some(list) => list.iter().map(s).filter(|n| !n.is_empty()).collect(),
+        None => sess["modelBreakdowns"]
+            .as_array()
+            .unwrap_or(&empty)
+            .iter()
+            .map(|mb| s(&mb["modelName"]))
+            .filter(|n| !n.is_empty())
+            .collect(),
+    };
+    names.join(", ")
+}
+
 fn claude_session_row(sess: &Value) -> SessionRow {
     SessionRow {
         session_id: s(&sess["sessionId"]),
@@ -77,6 +94,7 @@ fn claude_session_row(sess: &Value) -> SessionRow {
         ended_at: s_or_none(&sess["lastActivity"]),
         total_tokens: int(&sess["totalTokens"]),
         cost_usd: num(&sess["totalCost"]),
+        models: claude_session_models(sess),
     }
 }
 
@@ -88,6 +106,11 @@ fn codex_session_row(
     let folder = cwd_of
         .and_then(|f| f(&s(&sess["directory"]), &s(&sess["sessionFile"])))
         .unwrap_or_else(|| "(폴더 미지정)".to_string());
+    // daily의 codex 표기와 동일 규칙 — models 객체 키를 문서 순서대로 잇는다.
+    let models: Vec<&str> = sess["models"]
+        .as_object()
+        .map(|m| m.keys().map(String::as_str).collect())
+        .unwrap_or_default();
     SessionRow {
         session_id: s(&sess["sessionId"]),
         provider: "codex".into(),
@@ -96,6 +119,7 @@ fn codex_session_row(
         ended_at: s_or_none(&sess["lastActivity"]),
         total_tokens: int(&sess["totalTokens"]),
         cost_usd: num(&sess["costUSD"]),
+        models: models.join(", "),
     }
 }
 
@@ -167,7 +191,8 @@ mod tests {
         let j = json!({ "sessions": [{
             "sessionId": "abc", "projectPath": "D:\\proj", "totalCost": 1.5,
             "totalTokens": 999, "firstActivity": "2026-07-15T01:00:00Z",
-            "lastActivity": "2026-07-15T02:00:00Z"
+            "lastActivity": "2026-07-15T02:00:00Z",
+            "modelsUsed": ["claude-fable-5", "claude-haiku-4-5-20251001"]
         }]});
         let rows = normalize_sessions("claude", &j, None);
         assert_eq!(rows[0].session_id, "abc");
@@ -175,13 +200,30 @@ mod tests {
         assert_eq!(rows[0].started_at.as_deref(), Some("2026-07-15T01:00:00Z"));
         assert_eq!(rows[0].ended_at.as_deref(), Some("2026-07-15T02:00:00Z"));
         assert_eq!(rows[0].cost_usd, 1.5);
+        assert_eq!(rows[0].models, "claude-fable-5, claude-haiku-4-5-20251001");
+    }
+
+    #[test]
+    fn claude_session_models_fall_back_to_breakdowns_and_tolerate_absence() {
+        let j = json!({ "sessions": [
+            { "sessionId": "a", "modelBreakdowns": [{ "modelName": "claude-opus-5" }] },
+            { "sessionId": "b" },
+            // modelsUsed가 빈 배열이면 폴백 없이 빈 문자열(빈 배열은 '없음'이 아니라 '비어 있음')
+            { "sessionId": "c", "modelsUsed": [],
+              "modelBreakdowns": [{ "modelName": "claude-opus-5" }] }
+        ]});
+        let rows = normalize_sessions("claude", &j, None);
+        assert_eq!(rows[0].models, "claude-opus-5");
+        assert_eq!(rows[1].models, "");
+        assert_eq!(rows[2].models, "");
     }
 
     #[test]
     fn codex_sessions_resolve_folder_via_cwd_of() {
         let j = json!({ "sessions": [
             { "sessionId": "s1", "directory": "2026/07/15", "sessionFile": "rollout-x",
-              "costUSD": 0.5, "totalTokens": 10, "lastActivity": "2026-07-15T03:00:00Z" },
+              "costUSD": 0.5, "totalTokens": 10, "lastActivity": "2026-07-15T03:00:00Z",
+              "models": { "gpt-5.6-sol": {} } },
             { "sessionId": "s2", "directory": "2026/07/14", "sessionFile": "rollout-y",
               "costUSD": 0.7, "totalTokens": 20 }
         ]});
@@ -191,6 +233,8 @@ mod tests {
         let rows = normalize_sessions("codex", &j, Some(&resolver));
         assert_eq!(rows[0].folder, "D:\\real-cwd");
         assert_eq!(rows[0].started_at, None); // codex는 시작 시각 없음
+        assert_eq!(rows[0].models, "gpt-5.6-sol");
+        assert_eq!(rows[1].models, ""); // models 키 없음 → 미상
         assert_eq!(rows[1].folder, "(폴더 미지정)"); // 리졸버가 None → 폴백
         // 리졸버 자체가 없어도 폴백
         let rows2 = normalize_sessions("codex", &j, None);

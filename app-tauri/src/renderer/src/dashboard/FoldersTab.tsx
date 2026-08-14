@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { queryFolders, queryFolderSessions } from '../api'
 import { mergeFolderSplits, type FolderSplitRow } from './folderSplit'
+import { modelBadges } from './modelLabel'
 import { sessionLabel } from './sessionLabel'
 import { periodRange, type Period } from './period'
 import { fmtMoney, fmtTokens } from '../popup/format'
@@ -123,6 +124,15 @@ export default function FoldersTab({ period, providers }: FoldersTabProps): Reac
                     <span className="caret" />
                     <span className={`dot dot--${session.provider}`} />
                     <span className="fname">{sessionLabel(session)}</span>
+                    {/* 모델 뱃지 — 수집 이전에 기록된 세션은 models가 비어 있어 아무것도 그리지 않는다.
+                        "미상" 문구를 넣으면 대부분이 과거 행인 초기 화면이 그 문구로 뒤덮인다. */}
+                    <span className="fmodels">
+                      {modelBadges(session.models).map((name) => (
+                        <span key={name} className={`model-badge model-badge--${session.provider}`}>
+                          {name}
+                        </span>
+                      ))}
+                    </span>
                     <span className="ftok">{fmtTokens(session.totalTokens)}</span>
                     <span className="fcost">{fmtMoney(session.costUsd)}</span>
                   </div>
