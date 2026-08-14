@@ -33,6 +33,9 @@ function barBackground(row: FolderSplitRow): string {
 
 export default function FoldersTab({ period, providers }: FoldersTabProps): React.JSX.Element {
   const [rows, setRows] = useState<FolderSplitRow[]>([])
+  // 조회 실패를 "폴더가 없습니다"로 흘리지 않는다 — 스키마 마이그레이션 실패처럼 데이터가
+  // 있는데도 쿼리가 거부되는 경우를 빈 목록과 구별할 수 없게 된다.
+  const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const [sessionsByFolder, setSessionsByFolder] = useState<Record<string, SessionRow[]>>({})
   // 필터(period/providers) 세대 카운터 — 필터가 바뀔 때마다 effect 클린업에서 +1 된다.
@@ -50,12 +53,19 @@ export default function FoldersTab({ period, providers }: FoldersTabProps): Reac
     Promise.all([
       claudeSelected ? queryFolders({ ...range, providers: ['claude'] }) : Promise.resolve([]),
       codexSelected ? queryFolders({ ...range, providers: ['codex'] }) : Promise.resolve([])
-    ]).then(([claudeRows, codexRows]) => {
-      if (cancelled) return
-      setRows(mergeFolderSplits(claudeRows, codexRows))
-      setExpanded(new Set())
-      setSessionsByFolder({})
-    })
+    ])
+      .then(([claudeRows, codexRows]) => {
+        if (cancelled) return
+        setError(null)
+        setRows(mergeFolderSplits(claudeRows, codexRows))
+        setExpanded(new Set())
+        setSessionsByFolder({})
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return
+        setRows([])
+        setError(String(err))
+      })
 
     return () => {
       cancelled = true
@@ -80,6 +90,10 @@ export default function FoldersTab({ period, providers }: FoldersTabProps): Reac
       if (filterEpoch.current !== epoch) return // 응답 대기 중 필터가 바뀜 — 이전 기간의 세션, 폐기
       setSessionsByFolder((prevSessions) => ({ ...prevSessions, [folder]: sessions }))
     })
+  }
+
+  if (error !== null) {
+    return <div className="folders-empty folders-error">폴더 조회 실패 — {error}</div>
   }
 
   if (rows.length === 0) {

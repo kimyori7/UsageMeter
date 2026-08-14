@@ -15,6 +15,7 @@
   --color-codex: #19c37d;
   --color-codex-light: #5fe3ad;
   --color-warn: #e0a030;
+  --color-error: #e06c75;
 }
 
 * {
@@ -325,6 +326,14 @@ body {
   text-align: center;
   color: var(--color-text-faint);
   font-size: 12px;
+}
+
+/* 조회 실패는 "비어 있음"과 색으로 구분한다 — 흐린 회색이면 정상 상태로 읽힌다. */
+.folders-error {
+  color: var(--color-error);
+  padding-left: 16px;
+  padding-right: 16px;
+  word-break: break-word;
 }
 
 /* ── 칩(기간/프로바이더 토글) — 목업 dashboard.html의 .chip 그대로 ──── */
