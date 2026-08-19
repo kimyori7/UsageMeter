@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fetchCodexUsage } from './usage-api'
+import { fetchCodexUsage, USER_AGENT } from './usage-api'
 
 const AUTH = { accessToken: 'FAKE-ACCESS', accountId: 'acc-123' }
 
@@ -40,7 +40,7 @@ describe('fetchCodexUsage', () => {
         headers: {
           Authorization: 'Bearer FAKE-ACCESS',
           'chatgpt-account-id': 'acc-123',
-          'User-Agent': 'codex-cli'
+          'User-Agent': USER_AGENT
         }
       })
     )

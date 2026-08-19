@@ -5,6 +5,9 @@ import type { RateStatus, RateWindow } from '../types'
 import { readCodexAuth, type CodexAuth } from './auth'
 
 const USAGE_URL = 'https://chatgpt.com/backend-api/wham/usage'
+// 이 앱을 있는 그대로 밝히는 User-Agent — 다른 클라이언트의 이름을 쓰지 않는다.
+// v1은 더 이상 유지보수하지 않으므로 버전은 붙이지 않는다(package.json과 어긋날 여지 제거).
+export const USER_AGENT = 'UsageMeter'
 
 export interface CodexAccountIdentity {
   id: string
@@ -52,7 +55,7 @@ export async function fetchCodexUsage(
       headers: {
         Authorization: `Bearer ${auth.accessToken}`,
         'chatgpt-account-id': auth.accountId,
-        'User-Agent': 'codex-cli'
+        'User-Agent': USER_AGENT
       }
     })
   } catch {

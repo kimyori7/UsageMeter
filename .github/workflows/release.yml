@@ -1,23 +1,21 @@
 name: release
 
-# v2 rewrite: UsageMeter is now the Electron app under app/ (v1 Python has moved to legacy/ and is no
-# longer built or released). NOTE: untested until the first real v* tag push after this rewrite -
-# verify the produced artifact name/path against app/electron-builder.yml (artifactName:
-# ${productName}-Setup-${version}.${ext}) if this run fails.
+# v2부터 출하 대상은 app-tauri/ 의 Tauri 앱이다. app/(Electron v1)과 legacy/(Python v0.1)는
+# 보존만 되어 있고 빌드·릴리스하지 않는다.
 on:
   push:
     tags:
       - 'v*'
 
 permissions:
-  contents: write # softprops/action-gh-release needs this to create the release and upload the asset
+  contents: write # softprops/action-gh-release가 릴리스 생성·자산 업로드에 필요
 
 jobs:
   build:
     runs-on: windows-latest
     defaults:
       run:
-        working-directory: app
+        working-directory: app-tauri
     steps:
       - uses: actions/checkout@v4
 
@@ -25,21 +23,19 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: app/package-lock.json
+          cache-dependency-path: app-tauri/package-lock.json
 
+      - uses: dtolnay/rust-toolchain@stable
+
+      # build.rs가 node_modules의 ccusage exe를 src-tauri/binaries/로 복사하므로 npm ci가 선행돼야
+      # 한다. 없으면 build.rs가 panic으로 중단시킨다(조용히 빠지지 않는다).
       - name: Install dependencies
         run: npm ci
 
-      # electron-builder.yml sets npmRebuild: false, so the packaged better-sqlite3 ABI depends
-      # entirely on the postinstall install-app-deps having run correctly. Rebuild explicitly so a
-      # silent no-op can't ship a wrong-ABI installer (CI never boots the artifact to catch it).
-      - name: Rebuild native modules for Electron ABI
-        run: npx @electron/rebuild -f -w better-sqlite3
-
       - name: Build + package (Windows NSIS installer)
-        run: npm run build:win
+        run: npx tauri build
 
       - name: Attach installer to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: app/dist/UsageMeter-Setup-*.exe
+          files: app-tauri/src-tauri/target/release/bundle/nsis/UsageMeter_*_x64-setup.exe

@@ -6,6 +6,9 @@ use crate::providers::types::{RateError, RateStatus, RateWindow};
 use serde_json::Value;
 
 const USAGE_URL: &str = "https://chatgpt.com/backend-api/wham/usage";
+// 이 앱을 있는 그대로 밝히는 User-Agent — 다른 클라이언트의 이름을 쓰지 않는다.
+// 서버는 이 값을 검사하지 않는다(codex-cli / 앱 고유 값 / 헤더 없음 모두 200 확인, 2026-08-19).
+const USER_AGENT: &str = concat!("UsageMeter/", env!("CARGO_PKG_VERSION"));
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CodexAccountIdentity {
@@ -58,7 +61,7 @@ pub fn fetch_codex_usage(
         headers: &[
             ("Authorization", bearer.as_str()),
             ("chatgpt-account-id", auth.account_id.as_str()),
-            ("User-Agent", "codex-cli"),
+            ("User-Agent", USER_AGENT),
         ],
         body: None,
     });
@@ -142,7 +145,7 @@ mod tests {
         assert_eq!(reqs[0].url, "https://chatgpt.com/backend-api/wham/usage");
         assert!(reqs[0].headers.contains(&("Authorization".into(), "Bearer FAKE-AT".into())));
         assert!(reqs[0].headers.contains(&("chatgpt-account-id".into(), "acc-header".into())));
-        assert!(reqs[0].headers.contains(&("User-Agent".into(), "codex-cli".into())));
+        assert!(reqs[0].headers.contains(&("User-Agent".into(), USER_AGENT.into())));
     }
 
     #[test]
